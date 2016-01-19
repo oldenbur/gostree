@@ -75,5 +75,9 @@ func TestSTree(t *testing.T) {
 		So(len(ss), ShouldEqual, 2)
 		So(s.BoolVal("key3/key4"), ShouldEqual, true)
 		So(s.IntVal("key3/key5"), ShouldEqual, -12)
+
+		json, err := s.WriteJson(true)
+		So(err, ShouldBeNil)
+		log.Debugf("json: %s", string(json))
 	})
 }

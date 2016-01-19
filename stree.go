@@ -15,6 +15,8 @@ type settingsMap map[string]*reflect.Value
 
 type STree map[interface{}]interface{}
 
+// NewSTreeYaml reads yaml from the specified reader, parses it and returns
+// the structure as an STree.
 func NewSTreeYaml(r io.Reader) (stree STree, err error) {
 
 	buf := bytes.NewBuffer([]byte{})
@@ -30,6 +32,26 @@ func NewSTreeYaml(r io.Reader) (stree STree, err error) {
 	return
 }
 
+func (s STree) WriteJson(indent bool) ([]byte, error) {
+
+	iMap, err := s.unconvertKeys()
+	if err != nil {
+		return nil, fmt.Errorf("WriteJson error in unconvertKeys: %v", err)
+	}
+
+	var output []byte
+
+	if indent {
+		output, err = json.MarshalIndent(iMap, ``, `  `)
+	} else {
+		output, err = json.Marshal(iMap)
+	}
+
+	return output, err
+}
+
+// NewSTreeJson reads json from the specified reader, parses it and returns
+// the structure as an STree.
 func NewSTreeJson(r io.Reader) (stree STree, err error) {
 
 	buf := bytes.NewBuffer([]byte{})
@@ -187,7 +209,7 @@ func (t STree) SliceVal(path string) (a []interface{}) {
 }
 
 
-// ConvertKeys returns the input map re-typed with all keys as interface{}
+// convertKeys returns the input map re-typed with all keys as interface{}
 // wherever possible. This method facilitates use of the *Val methods for
 // Unmarshaled json structures.
 func convertKeys(input map[string]interface{}) (result STree, err error) {
@@ -215,3 +237,40 @@ func convertKeys(input map[string]interface{}) (result STree, err error) {
 
 	return result, nil
 }
+
+
+// unconvertKeys returns a nested map with the same structure as the STree,
+// but with string-typed keys, for use in json.Marshall() and the like.
+func (s STree) unconvertKeys() (map[string]interface{}, error) {
+
+	result := make(map[string]interface{})
+
+	for k, v := range s {
+
+		var kStr string
+		if kStrVal, ok := k.(string); !ok {
+			return nil, fmt.Errorf("unconvertKeys failed to convert key: %v", k)
+		} else {
+			kStr = kStrVal
+		}
+
+		val := reflect.ValueOf(v)
+		if isPrimitive(val.Kind()) {
+			result[kStr] = v
+		} else if /*vSlice*/ _, ok := v.([]interface{}); ok {
+			// leave array items out for now
+		} else if sVal, ok := v.(STree); ok {
+			cVal, err := sVal.unconvertKeys()
+			if err != nil {
+				return nil, fmt.Errorf("unconvertKeys error converting key %s: %v", k, err)
+			}
+			result[kStr] = interface{}(cVal)
+		} else {
+			return nil, fmt.Errorf("unconvertKeys unexpected type case")
+		}
+	}
+
+	return result, nil
+}
+
+
