@@ -1,6 +1,7 @@
 package gostree
 
 import (
+	"strings"
 	"testing"
 
 	log "github.com/cihub/seelog"
@@ -26,7 +27,7 @@ func init() {
 	}
 }
 
-func TestStruct(t *testing.T) {
+func TestSTree(t *testing.T) {
 
 	Convey("findStructElems", t, func() {
 
@@ -60,8 +61,19 @@ func TestStruct(t *testing.T) {
 			T3: []float64{1.23, 4.56},
 		}
 
-		_, err := findStructElemsPath("", &t, SettingsMap{})
+		_, err := findStructElemsPath("", &t, settingsMap{})
 		So(err, ShouldBeNil)
 	})
 
+	Convey("Json tree access", t, func() {
+
+		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
+		So(err, ShouldBeNil)
+		So(s.StrVal("key1"), ShouldEqual, "val1")
+		So(s.IntVal("key2"), ShouldEqual, 1234)
+		ss := s.STreeVal("key3")
+		So(len(ss), ShouldEqual, 2)
+		So(s.BoolVal("key3/key4"), ShouldEqual, true)
+		So(s.IntVal("key3/key5"), ShouldEqual, -12)
+	})
 }
