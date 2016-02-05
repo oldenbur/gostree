@@ -3,7 +3,6 @@ package gostree
 import (
 	"strings"
 	"testing"
-
 	log "github.com/cihub/seelog"
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -75,5 +74,14 @@ func TestSTree(t *testing.T) {
 		So(len(ss), ShouldEqual, 2)
 		So(s.BoolVal("key3/key4"), ShouldEqual, true)
 		So(s.IntVal("key3/key5"), ShouldEqual, -12)
+	})
+
+	Convey("Json array structure", t, func() {
+
+		data := `{"a": [[{"b": 1, "d": 2}, 19], "c"]}`
+		s, err := NewSTreeJson(strings.NewReader(data))
+		So(err, ShouldBeNil)
+		log.Debugf("s: %v", s)
+
 	})
 }

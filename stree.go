@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	yaml "gopkg.in/yaml.v2"
+	log "github.com/cihub/seelog"
 )
 
 type settingsMap map[string]*reflect.Value
@@ -118,14 +119,17 @@ func PrintVal(v *reflect.Value) string {
 func (t STree) Val(path string) interface{} {
 
 	keys := strings.Split(path, "/")
+	log.Debugf("Val(%s) - %T", path, t)
 
 	if len(keys) < 1 {
 		return nil
 	} else if len(keys) == 1 {
+		log.Debugf("Val(%s) - LastKey: %v", path, t[keys[0]])
 		return t[keys[0]]
 	} else if data, ok := t[keys[0]].(STree); ok {
 		return data.Val(strings.Join(keys[1:], "/"))
 	} else if data, ok := t[keys[0]].([]interface{}); ok {
+		log.Debugf("Val(%s) - slice: %v", path, data)
 		return data
 	} else {
 		return nil
@@ -190,27 +194,70 @@ func (t STree) SliceVal(path string) (a []interface{}) {
 // ConvertKeys returns the input map re-typed with all keys as interface{}
 // wherever possible. This method facilitates use of the *Val methods for
 // Unmarshaled json structures.
-func convertKeys(input map[string]interface{}) (result STree, err error) {
+func convertKeys(input map[string]interface{}) (STree, error) {
 
-	result = make(STree)
-
+	result := STree{}
 	for k, v := range input {
 
 		var iKey interface{} = k
 		val := reflect.ValueOf(v)
 		if isPrimitive(val.Kind()) {
 			result[iKey] = v
-		} else if /*vSlice*/ _, ok := v.([]interface{}); ok {
-			// leave array items out for now
-		} else if vMap, ok := v.(map[string]interface{}); ok {
-			rval, err := convertKeys(vMap)
-			if err != nil {
-				return nil, fmt.Errorf("convertKeys error converting key %s: %v", k, err)
+
+		} else if vSlice, ok := v.([]interface{}); ok {
+			sVal := []interface{}{}
+			for _, s := range vSlice {
+				sConv, err := convertVal(s)
+				if err != nil {
+					return nil, err
+				}
+				sVal = append(sVal, sConv)
 			}
-			result[iKey] = interface{}(rval)
+			result[iKey] = interface{}(sVal)
+
+		} else if vMap, ok := v.(map[string]interface{}); ok {
+			mVal, err := convertKeys(vMap)
+			if err != nil {
+				return nil, err
+			}
+			result[iKey] = interface{}(mVal)
+
 		} else {
-			return nil, fmt.Errorf("convertKeys unexpected type case")
+			return nil, fmt.Errorf("convertKeys unexpected type case for key %v", k)
 		}
+	}
+
+	return result, nil
+}
+
+func convertVal(v interface{}) (interface{}, error) {
+
+	var result interface{}
+
+	val := reflect.ValueOf(v)
+	if isPrimitive(val.Kind()) {
+		result = v
+
+	} else if vSlice, ok := v.([]interface{}); ok {
+		sVal := []interface{}{}
+		for _, s := range vSlice {
+			sConv, err := convertVal(s)
+			if err != nil {
+				return nil, err
+			}
+			sVal = append(sVal, sConv)
+		}
+		result = interface{}(sVal)
+
+	} else if vMap, ok := v.(map[string]interface{}); ok {
+		mVal, err := convertKeys(vMap)
+		if err != nil {
+			return nil, fmt.Errorf("convertVal error converting val: %v", vMap, err)
+		}
+		result = interface{}(mVal)
+
+	} else {
+		return nil, fmt.Errorf("convertVal unexpected type case")
 	}
 
 	return result, nil
