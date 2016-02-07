@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 
 	yaml "gopkg.in/yaml.v2"
@@ -113,6 +115,9 @@ func PrintVal(v *reflect.Value) string {
 	}
 }
 
+// keyRegexp matches strings of the form key_name or slice_name[123]
+var keyRegexp *regexp.Regexp = regexp.MustCompile(`^(\w+)(?:\[(\d+)\])?$`)
+
 // Val returns the leaf value at the position specified by path,
 // which is a slash delimited list of nested keys in data, e.g.
 // level1/level2/key
@@ -121,19 +126,63 @@ func (t STree) Val(path string) interface{} {
 	keys := strings.Split(path, "/")
 	log.Debugf("Val(%s) - %T", path, t)
 
-	if len(keys) < 1 {
-		return nil
-	} else if len(keys) == 1 {
-		log.Debugf("Val(%s) - LastKey: %v", path, t[keys[0]])
-		return t[keys[0]]
-	} else if data, ok := t[keys[0]].(STree); ok {
-		return data.Val(strings.Join(keys[1:], "/"))
-	} else if data, ok := t[keys[0]].([]interface{}); ok {
-		log.Debugf("Val(%s) - slice: %v", path, data)
-		return data
-	} else {
+	key_comps := keyRegexp.FindStringSubmatch(keys[0])
+	if key_comps == nil || len(key_comps) < 1 {
+		log.Warnf("val failed to parse key %s", keys[0])
 		return nil
 	}
+
+	key := key_comps[1]
+	idx := -1
+	if len(key_comps[2]) > 0 {
+		i, err := strconv.Atoi(key_comps[2])
+		if err != nil || i < 0 {
+			log.Warnf("val failed to parse slice index %s", key_comps[1])
+			return nil
+		}
+		idx = i
+	}
+
+	if len(keys) < 1 {
+		return nil
+
+	} else if len(keys) == 1 && idx < 0 {
+		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
+		return t[key]
+
+	} else if data, ok := t[key].(STree); ok {
+		if idx >= 0 {
+			log.Warnf("Val unexpected index for STree value: %s", keys[0])
+			return nil
+		}
+		return data.Val(strings.Join(keys[1:], "/"))
+
+	} else if data, ok := t[key].([]interface{}); ok {
+		// TODO: break this case out to recursively handle nested slices
+		log.Debugf("Val(%s) - slice: %v", path, data)
+		if idx >= 0 && idx < len(data) {
+			result := data[idx]
+			if len(keys) < 2 {
+				return result
+			} else if sval, ok := result.(STree); ok {
+				return sval.Val(strings.Join(keys[1:], "/"))
+			}
+
+		} else if idx < 0 {
+			if len(keys) > 1 {
+				log.Warnf("Val requires index to traverse slice value for key: %s", keys[0])
+				return nil
+			}
+			return data
+
+		} else {
+			log.Warnf("Val invalid slice key index: %s", keys[0])
+			return nil
+		}
+	}
+
+	log.Warnf("Val failed to produce value for key: %s", keys[0])
+	return nil
 }
 
 // SVal returns the value stored in data at the path, converting it
@@ -200,31 +249,11 @@ func convertKeys(input map[string]interface{}) (STree, error) {
 	for k, v := range input {
 
 		var iKey interface{} = k
-		val := reflect.ValueOf(v)
-		if isPrimitive(val.Kind()) {
-			result[iKey] = v
-
-		} else if vSlice, ok := v.([]interface{}); ok {
-			sVal := []interface{}{}
-			for _, s := range vSlice {
-				sConv, err := convertVal(s)
-				if err != nil {
-					return nil, err
-				}
-				sVal = append(sVal, sConv)
-			}
-			result[iKey] = interface{}(sVal)
-
-		} else if vMap, ok := v.(map[string]interface{}); ok {
-			mVal, err := convertKeys(vMap)
-			if err != nil {
-				return nil, err
-			}
-			result[iKey] = interface{}(mVal)
-
-		} else {
-			return nil, fmt.Errorf("convertKeys unexpected type case for key %v", k)
+		iVal, err := convertVal(v)
+		if err != nil {
+			return nil, err
 		}
+		result[iKey] = iVal
 	}
 
 	return result, nil

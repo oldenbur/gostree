@@ -78,10 +78,13 @@ func TestSTree(t *testing.T) {
 
 	Convey("Json array structure", t, func() {
 
-		data := `{"a": [[{"b": 1, "d": 2}, 19], "c"]}`
+		data := `{"a": [{"b": 1, "d": 2}, 19], "c": "bucky"}`
 		s, err := NewSTreeJson(strings.NewReader(data))
 		So(err, ShouldBeNil)
 		log.Debugf("s: %v", s)
-
+		sl1 := s.SliceVal("a")
+		So(len(sl1), ShouldEqual, 2)
+		So(s.IntVal("a[0]/d"), ShouldEqual, 2)
+		So(s.IntVal("a[1]"), ShouldEqual, 19)
 	})
 }
