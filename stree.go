@@ -301,7 +301,8 @@ func marshalJSONVal(v interface{}) ([]byte, error) {
 
 	val := reflect.ValueOf(v)
 	if val.Kind() == reflect.String {
-		return []byte(fmt.Sprintf(`"%s"`, printVal(val))), nil
+		sVal := strings.Replace(val.String(), `\`, `\\`, -1)
+		return []byte(fmt.Sprintf(`"%s"`, sVal)), nil
 
 	} else if isPrimitive(val.Kind()) {
 		return []byte(fmt.Sprintf(`%s`, printVal(val))), nil
