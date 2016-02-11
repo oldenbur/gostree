@@ -95,7 +95,7 @@ func isPrimitive(k reflect.Kind) bool {
 		k == reflect.String)
 }
 
-func PrintVal(v *reflect.Value) string {
+func printVal(v reflect.Value) string {
 
 	switch v.Kind() {
 	case reflect.Bool:
@@ -124,7 +124,7 @@ var keyRegexp *regexp.Regexp = regexp.MustCompile(`^(\w+)(?:\[(\d+)\])?$`)
 func (t STree) Val(path string) interface{} {
 
 	keys := strings.Split(path, "/")
-	log.Debugf("Val(%s) - %T", path, t)
+//	log.Debugf("Val(%s) - %T", path, t)
 
 	key_comps := keyRegexp.FindStringSubmatch(keys[0])
 	if key_comps == nil || len(key_comps) < 1 {
@@ -147,7 +147,7 @@ func (t STree) Val(path string) interface{} {
 		return nil
 
 	} else if len(keys) == 1 && idx < 0 {
-		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
+//		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
 		return t[key]
 
 	} else if data, ok := t[key].(STree); ok {
@@ -159,7 +159,7 @@ func (t STree) Val(path string) interface{} {
 
 	} else if data, ok := t[key].([]interface{}); ok {
 		// TODO: break this case out to recursively handle nested slices
-		log.Debugf("Val(%s) - slice: %v", path, data)
+//		log.Debugf("Val(%s) - slice: %v", path, data)
 		if idx >= 0 && idx < len(data) {
 			result := data[idx]
 			if len(keys) < 2 {
@@ -239,6 +239,78 @@ func (t STree) SliceVal(path string) (a []interface{}) {
 	return
 }
 
+func ValueOf(v interface{}) (STree, error) {
+	if sval, ok := v.(STree); ok {
+		return sval, nil
+	} else {
+		return nil, fmt.Errorf("ValueOf failed to convert input (type %T)", v)
+	}
+}
+
+// MarhsalJSON returns a JSON-rendered representation of the subject STree.
+func (t STree) MarshalJSON() ([]byte, error) {
+
+	buf := []byte{'{'}
+	i := 0
+
+	for k, v := range t {
+
+		if i > 0 {
+			buf = append(buf, ',')
+		}
+		buf = append(buf, []byte(fmt.Sprintf(`"%v":`, k))...)
+
+		vMarsh, err := marshalJSONVal(v)
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, vMarsh...)
+
+		i += 1
+	}
+	buf = append(buf, '}')
+
+	return buf, nil
+}
+
+// marshalJSONVal examines the structure of the specified value and returns
+// a JSON-rendered representation of it.
+func marshalJSONVal(v interface{}) ([]byte, error) {
+
+	val := reflect.ValueOf(v)
+	if val.Kind() == reflect.String {
+		return []byte(fmt.Sprintf(`"%s"`, printVal(val))), nil
+
+	} else if isPrimitive(val.Kind()) {
+		return []byte(fmt.Sprintf(`%s`, printVal(val))), nil
+
+	} else if vSlice, ok := v.([]interface{}); ok {
+		buf := []byte{}
+		buf = append(buf, '[')
+
+		for i, sv := range vSlice {
+			m, err := marshalJSONVal(sv)
+			if err != nil {
+				return nil, err
+			}
+			if i > 0 {
+				buf = append(buf, ',')
+			}
+			buf = append(buf, m...)
+		}
+		buf = append(buf, ']')
+		return buf, nil
+
+	} else if vSTree, ok := v.(STree); ok {
+		buf, err := vSTree.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		return buf, nil
+	}
+
+	return nil, fmt.Errorf("marshalJSONVal unhandled value type for %v", v)
+}
 
 // ConvertKeys returns the input map re-typed with all keys as interface{}
 // wherever possible. This method facilitates use of the *Val methods for
