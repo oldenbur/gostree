@@ -1,0 +1,51 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"path": "github.com/cihub/seelog",
+			"revision": "5841159c495ad98691aac2bf90113c040e62bac2",
+			"revisionTime": "2015-09-30T21:49:31+03:00"
+		},
+		{
+			"path": "github.com/jtolds/gls",
+			"revision": "8ddce2a84170772b95dd5d576c48d517b22cac63",
+			"revisionTime": "2016-01-05T15:08:40-07:00"
+		},
+		{
+			"path": "github.com/smartystreets/assertions",
+			"revision": "287b4346dc4e71a038c346375a9d572453bc469b",
+			"revisionTime": "2016-02-04T20:39:31-07:00"
+		},
+		{
+			"path": "github.com/smartystreets/assertions/internal/go-render/render",
+			"revision": "287b4346dc4e71a038c346375a9d572453bc469b",
+			"revisionTime": "2016-02-04T20:39:31-07:00"
+		},
+		{
+			"path": "github.com/smartystreets/assertions/internal/oglematchers",
+			"revision": "287b4346dc4e71a038c346375a9d572453bc469b",
+			"revisionTime": "2016-02-04T20:39:31-07:00"
+		},
+		{
+			"path": "github.com/smartystreets/goconvey/convey",
+			"revision": "bf58a9a1291224109919756b4dcc469c670cc7e4",
+			"revisionTime": "2016-02-04T20:35:52-07:00"
+		},
+		{
+			"path": "github.com/smartystreets/goconvey/convey/gotest",
+			"revision": "bf58a9a1291224109919756b4dcc469c670cc7e4",
+			"revisionTime": "2016-02-04T20:35:52-07:00"
+		},
+		{
+			"path": "github.com/smartystreets/goconvey/convey/reporting",
+			"revision": "bf58a9a1291224109919756b4dcc469c670cc7e4",
+			"revisionTime": "2016-02-04T20:35:52-07:00"
+		},
+		{
+			"path": "gopkg.in/yaml.v2",
+			"revision": "53feefa2559fb8dfa8d81baad31be332c97d6c77",
+			"revisionTime": "2015-09-24T11:23:14-03:00"
+		}
+	]
+}
