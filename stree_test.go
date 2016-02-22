@@ -3,6 +3,7 @@ package gostree
 import (
 	"strings"
 	"testing"
+
 	log "github.com/cihub/seelog"
 	. "github.com/smartystreets/goconvey/convey"
 )
