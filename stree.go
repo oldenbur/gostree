@@ -137,6 +137,29 @@ func printVal(v reflect.Value) string {
 	}
 }
 
+// Keys returns a slice containing all top-level keys of this STree
+func (t STree) Keys() ([]interface{}) {
+	keys := []interface{}{}
+	for k, _ := range t {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+// KeyStrings returns a slice containing all top-level keys of this STree converted to
+// string, or an error if the conversion fails for any key
+func (t STree) KeyStrings() ([]string, error) {
+	keys := []string{}
+	for k, _ := range t {
+		if s, ok := k.(string); !ok {
+			return keys, fmt.Errorf("KeyStrings failed to convert %v to string type", k)
+		} else {
+			keys = append(keys, s)
+		}
+	}
+	return keys, nil
+}
+
 // keyRegexp matches strings of the form key_name or slice_name[123]
 var keyRegexp *regexp.Regexp = regexp.MustCompile(`^(\w+)(?:\[(\d+)\])?$`)
 

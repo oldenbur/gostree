@@ -81,6 +81,33 @@ func TestSTree(t *testing.T) {
 		log.Debugf("json: %s", string(json))
 	})
 
+	Convey("Json Keys", t, func() {
+
+		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
+		So(err, ShouldBeNil)
+
+		keys := s.Keys()
+		So(len(keys), ShouldEqual, 3)
+		So(keys, ShouldContain, "key1")
+		So(keys, ShouldContain, "key2")
+		So(keys, ShouldContain, "key3")
+		log.Debugf("Json keys: %v", keys)
+	})
+
+	Convey("Json KeyStrings", t, func() {
+
+		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
+		So(err, ShouldBeNil)
+
+		keys, err := s.KeyStrings()
+		So(err, ShouldBeNil)
+		So(len(keys), ShouldEqual, 3)
+		So(keys, ShouldContain, "key1")
+		So(keys, ShouldContain, "key2")
+		So(keys, ShouldContain, "key3")
+		log.Debugf("Json key strings: %v", keys)
+	})
+
 	Convey("Json array structure\n", t, func() {
 
 		data := `{"a": [{"b": 1, "d": "DDD"}, 19], "c": "bucky"}`
@@ -99,5 +126,31 @@ func TestSTree(t *testing.T) {
 		st1j, err := st1.MarshalJSON()
 		So(err, ShouldBeNil)
 		log.Debugf("st1j: %s", string(st1j))
+	})
+
+	Convey("Json array structure\n", t, func() {
+
+		data := `
+---
+product:
+    - sku         : BL394D
+      quantity    : 4
+      description : Basketball
+      price       : 450.00
+    - sku         : BL4438H
+      quantity    : 1
+      description : Super Hoop
+      price       : 2392.00
+tax  : 251.42
+total: 4443.52
+comments: >
+    Late afternoon is best.
+    Backup contact is Nancy
+    Billsmer @ 338-4338.
+`
+		s, err := NewSTreeYaml(strings.NewReader(data))
+		So(err, ShouldBeNil)
+		log.Debugf("s: %v", s)
+
 	})
 }
