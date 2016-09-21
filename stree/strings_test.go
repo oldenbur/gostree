@@ -1,4 +1,4 @@
-package gostree
+package stree
 
 import (
 	"os"

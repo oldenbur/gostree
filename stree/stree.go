@@ -1,4 +1,4 @@
-package gostree
+package stree
 
 import (
 	"bytes"
@@ -10,13 +10,23 @@ import (
 	"strconv"
 	"strings"
 
-	yaml "gopkg.in/yaml.v2"
 	log "github.com/cihub/seelog"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type settingsMap map[string]*reflect.Value
 
 type STree map[interface{}]interface{}
+
+type FieldPath []string
+
+func (p FieldPath) String() string {
+	return strings.Join([]string(p), "/")
+}
+
+func ValueOfPath(p string) FieldPath {
+	return FieldPath(strings.Split(p, "/"))
+}
 
 // NewSTreeYaml reads yaml from the specified reader, parses it and returns
 // the structure as an STree.
@@ -33,6 +43,10 @@ func NewSTreeYaml(r io.Reader) (stree STree, err error) {
 		return nil, fmt.Errorf("NewSTreeYaml error in yaml.Unmarshal: ", err)
 	}
 	return
+}
+
+func (s STree) WriteYaml() ([]byte, error) {
+	return yaml.Marshal(s)
 }
 
 func (s STree) WriteJson(indent bool) ([]byte, error) {
@@ -117,6 +131,41 @@ func isPrimitive(k reflect.Kind) bool {
 		k == reflect.String)
 }
 
+func isBool(k reflect.Kind) bool {
+	return k == reflect.Bool
+}
+
+func isInt(k reflect.Kind) bool {
+	return (k == reflect.Int ||
+		k == reflect.Int8 ||
+		k == reflect.Int16 ||
+		k == reflect.Int32 ||
+		k == reflect.Int64)
+}
+
+func isUint(k reflect.Kind) bool {
+	return (k == reflect.Uint ||
+		k == reflect.Uint8 ||
+		k == reflect.Uint16 ||
+		k == reflect.Uint32 ||
+		k == reflect.Uint64)
+}
+
+func isFloat(k reflect.Kind) bool {
+	return (k == reflect.Uintptr ||
+		k == reflect.Float32 ||
+		k == reflect.Float64)
+}
+
+func isComplex(k reflect.Kind) bool {
+	return (k == reflect.Complex64 ||
+		k == reflect.Complex128)
+}
+
+func isString(k reflect.Kind) bool {
+	return k == reflect.String
+}
+
 func printVal(v reflect.Value) string {
 
 	switch v.Kind() {
@@ -138,7 +187,7 @@ func printVal(v reflect.Value) string {
 }
 
 // Keys returns a slice containing all top-level keys of this STree
-func (t STree) Keys() ([]interface{}) {
+func (t STree) Keys() []interface{} {
 	keys := []interface{}{}
 	for k, _ := range t {
 		keys = append(keys, k)
@@ -169,7 +218,7 @@ var keyRegexp *regexp.Regexp = regexp.MustCompile(`^(\w+)(?:\[(\d+)\])?$`)
 func (t STree) Val(path string) interface{} {
 
 	keys := strings.Split(path, "/")
-//	log.Debugf("Val(%s) - %T", path, t)
+	//	log.Debugf("Val(%s) - %T", path, t)
 
 	key_comps := keyRegexp.FindStringSubmatch(keys[0])
 	if key_comps == nil || len(key_comps) < 1 {
@@ -192,7 +241,7 @@ func (t STree) Val(path string) interface{} {
 		return nil
 
 	} else if len(keys) == 1 && idx < 0 {
-//		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
+		//		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
 		return t[key]
 
 	} else if data, ok := t[key].(STree); ok {
@@ -204,7 +253,7 @@ func (t STree) Val(path string) interface{} {
 
 	} else if data, ok := t[key].([]interface{}); ok {
 		// TODO: break this case out to recursively handle nested slices
-//		log.Debugf("Val(%s) - slice: %v", path, data)
+		//		log.Debugf("Val(%s) - slice: %v", path, data)
 		if idx >= 0 && idx < len(data) {
 			result := data[idx]
 			if len(keys) < 2 {
@@ -241,7 +290,7 @@ func (t STree) StrVal(path string) (s string) {
 	return
 }
 
-// IVal returns the value stored in data at the path, converting it
+// IntVal returns the value stored in data at the path, converting it
 // to an int64, and returning the zero value if the int is not found.
 func (t STree) IntVal(path string) (i int64) {
 	v := t.Val(path)
@@ -251,6 +300,16 @@ func (t STree) IntVal(path string) (i int64) {
 	} else if ival, ok := v.(float64); ok {
 		i64 := int64(ival)
 		i = i64
+	}
+	return
+}
+
+// FloatVal returns the value stored in data at the path, converting it
+// to an int64, and returning the zero value if the value cannot be converted.
+func (t STree) FloatVal(path string) (f float64) {
+	v := t.Val(path)
+	if fval, ok := v.(float64); ok {
+		f = fval
 	}
 	return
 }
@@ -275,7 +334,8 @@ func (t STree) STreeVal(path string) (s STree) {
 	return
 }
 
-
+// SliceVal returns the value stored in the STree at the path, converting
+// it to a []interface{} and returning nil if the operation fails.
 func (t STree) SliceVal(path string) (a []interface{}) {
 	v := t.Val(path)
 	if aval, ok := v.([]interface{}); ok {
@@ -290,72 +350,6 @@ func ValueOf(v interface{}) (STree, error) {
 	} else {
 		return nil, fmt.Errorf("ValueOf failed to convert input (type %T)", v)
 	}
-}
-
-// MarhsalJSON returns a JSON-rendered representation of the subject STree.
-func (t STree) MarshalJSON() ([]byte, error) {
-
-	buf := []byte{'{'}
-	i := 0
-
-	for k, v := range t {
-
-		if i > 0 {
-			buf = append(buf, ',')
-		}
-		buf = append(buf, []byte(fmt.Sprintf(`"%v":`, k))...)
-
-		vMarsh, err := marshalJSONVal(v)
-		if err != nil {
-			return nil, err
-		}
-		buf = append(buf, vMarsh...)
-
-		i += 1
-	}
-	buf = append(buf, '}')
-
-	return buf, nil
-}
-
-// marshalJSONVal examines the structure of the specified value and returns
-// a JSON-rendered representation of it.
-func marshalJSONVal(v interface{}) ([]byte, error) {
-
-	val := reflect.ValueOf(v)
-	if val.Kind() == reflect.String {
-		sVal := strings.Replace(val.String(), `\`, `\\`, -1)
-		return []byte(fmt.Sprintf(`"%s"`, sVal)), nil
-
-	} else if isPrimitive(val.Kind()) {
-		return []byte(fmt.Sprintf(`%s`, printVal(val))), nil
-
-	} else if vSlice, ok := v.([]interface{}); ok {
-		buf := []byte{}
-		buf = append(buf, '[')
-
-		for i, sv := range vSlice {
-			m, err := marshalJSONVal(sv)
-			if err != nil {
-				return nil, err
-			}
-			if i > 0 {
-				buf = append(buf, ',')
-			}
-			buf = append(buf, m...)
-		}
-		buf = append(buf, ']')
-		return buf, nil
-
-	} else if vSTree, ok := v.(STree); ok {
-		buf, err := vSTree.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		return buf, nil
-	}
-
-	return nil, fmt.Errorf("marshalJSONVal unhandled value type for %v", v)
 }
 
 // convertKeys returns the input map re-typed with all keys as interface{}
@@ -410,7 +404,6 @@ func convertVal(v interface{}) (interface{}, error) {
 	return result, nil
 }
 
-
 // unconvertKeys returns a nested map with the same structure as the STree,
 // but with string-typed keys, for use in json.Marshall() and the like.
 func (s STree) unconvertKeys() (map[string]interface{}, error) {
@@ -445,4 +438,26 @@ func (s STree) unconvertKeys() (map[string]interface{}, error) {
 	return result, nil
 }
 
+// FieldPaths returns a slice of FieldPaths representing the list of full key paths to
+// each "leaf" of the STree.
+func (s STree) FieldPaths() (paths []FieldPath) {
+	return s.fieldPaths([]string{}, paths)
+}
 
+func (s STree) fieldPaths(parent FieldPath, tally []FieldPath) (paths []FieldPath) {
+	for k, v := range s {
+		var path FieldPath
+		if f, ok := k.(string); ok {
+			path = append(parent, f)
+		} else {
+			panic(fmt.Sprintf("fieldPaths failed to convert STree k '%v' to Field", k))
+		}
+
+		if vs, err := ValueOf(v); err == nil {
+			tally = vs.fieldPaths(path, tally)
+		} else {
+			tally = append(tally, path)
+		}
+	}
+	return tally
+}

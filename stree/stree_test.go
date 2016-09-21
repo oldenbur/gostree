@@ -1,4 +1,4 @@
-package gostree
+package stree
 
 import (
 	"strings"
@@ -8,24 +8,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func init() {
-
-	testConfig := `
-        <seelog type="sync" minlevel="debug">
-            <outputs formatid="main"><console/></outputs>
-            <formats><format id="main" format="%Date %Time [%LEVEL] %Msg%n"/></formats>
-        </seelog>`
-
-	logger, err := log.LoggerFromConfigAsBytes([]byte(testConfig))
-	if err != nil {
-		panic(err)
-	}
-
-	err = log.ReplaceLogger(logger)
-	if err != nil {
-		panic(err)
-	}
-}
+func init() { InitTestLogger() }
 
 func TestSTree(t *testing.T) {
 
@@ -114,7 +97,7 @@ func TestSTree(t *testing.T) {
 		s, err := NewSTreeJson(strings.NewReader(data))
 		So(err, ShouldBeNil)
 		log.Debugf("s: %v", s)
-		sj, err := s.MarshalJSON()
+		sj, err := s.WriteJson(true)
 		So(err, ShouldBeNil)
 		log.Debugf("s json: %s", string(sj))
 		sl1 := s.SliceVal("a")
@@ -123,34 +106,80 @@ func TestSTree(t *testing.T) {
 		So(s.IntVal("a[1]"), ShouldEqual, 19)
 		st1 := s.STreeVal("a[0]")
 		So(st1.IntVal("b"), ShouldEqual, 1)
-		st1j, err := st1.MarshalJSON()
+		st1j, err := st1.WriteJson(true)
 		So(err, ShouldBeNil)
 		log.Debugf("st1j: %s", string(st1j))
 	})
 
-	Convey("Json array structure\n", t, func() {
-
-		data := `
+	var yamlData string = `
 ---
 product:
-    - sku         : BL394D
-      quantity    : 4
-      description : Basketball
-      price       : 450.00
-    - sku         : BL4438H
-      quantity    : 1
-      description : Super Hoop
-      price       : 2392.00
+- sku         : BL394D
+  quantity    : 4
+  description : Basketball
+  price       : 450.00
+- sku         : BL4438H
+  quantity    : 1
+  description : Super Hoop
+  price       : 2392.00
 tax  : 251.42
 total: 4443.52
 comments: >
-    Late afternoon is best.
-    Backup contact is Nancy
-    Billsmer @ 338-4338.
+  Late afternoon is best.
+  Backup contact is Nancy
+  Billsmer @ 338-4338.
 `
-		s, err := NewSTreeYaml(strings.NewReader(data))
+
+	Convey("NewSTreeYaml\n", t, func() {
+
+		s, err := NewSTreeYaml(strings.NewReader(yamlData))
 		So(err, ShouldBeNil)
 		log.Debugf("s: %v", s)
 
+		out, err := s.WriteYaml()
+		So(err, ShouldBeNil)
+		log.Debugf("out: %s", string(out))
 	})
+
+	Convey("FieldPaths", t, func() {
+
+		json := `{
+	"key1": "val1",
+	"key2": 1234,
+	"key3": {
+		"key4": true,
+		"key5": -12.34,
+		"key6": {
+			"key7": [1, 2, 3]
+		}
+	}}`
+
+		s, err := NewSTreeJson(strings.NewReader(json))
+		So(err, ShouldBeNil)
+
+		paths := s.FieldPaths()
+		So(len(paths), ShouldEqual, 5)
+		for i, path := range paths {
+			log.Debugf("path[%d] = %s", i, path)
+		}
+		pathsCheck := []FieldPath{
+			ValueOfPath("key1"),
+			ValueOfPath("key2"),
+			ValueOfPath("key3/key4"),
+			ValueOfPath("key3/key5"),
+			ValueOfPath("key3/key6/key7"),
+		}
+		var m map[string]bool = make(map[string]bool)
+		for _, path := range pathsCheck {
+			m[path.String()] = false
+		}
+		for _, path := range paths {
+			m[path.String()] = true
+		}
+		So(len(m), ShouldEqual, len(pathsCheck))
+		for _, v := range m {
+			So(v, ShouldBeTrue)
+		}
+	})
+
 }
