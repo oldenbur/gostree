@@ -1,4 +1,4 @@
-package gostree
+package stree
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"path"
 	"runtime"
+
+	log "github.com/cihub/seelog"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567789=!@#$%^&*()_+~`;:' ")
@@ -50,4 +52,23 @@ func PackageDirectory() (string, error) {
 		err = fmt.Errorf("PackageDirectory Caller failed")
 	}
 	return path.Dir(dir), err
+}
+
+func InitTestLogger() {
+
+	testConfig := `
+        <seelog type="sync" minlevel="debug">
+            <outputs formatid="main"><console/></outputs>
+            <formats><format id="main" format="%Date %Time [%LEVEL] %Msg%n"/></formats>
+        </seelog>`
+
+	logger, err := log.LoggerFromConfigAsBytes([]byte(testConfig))
+	if err != nil {
+		panic(err)
+	}
+
+	err = log.ReplaceLogger(logger)
+	if err != nil {
+		panic(err)
+	}
 }
