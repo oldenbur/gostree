@@ -56,7 +56,8 @@ func TestSTreeCmp(t *testing.T) {
 		s2, err := NewSTreeJson(strings.NewReader(json2))
 		So(err, ShouldBeNil)
 
-		cmp := s1.CompareTo(s2)
+		cmp, err := s1.CompareTo(s2)
+		So(err, ShouldBeNil)
 		So(len(cmp), ShouldEqual, 12)
 
 		checkComparison(cmp, "key1", COMP_NO_DIFFERENCE)

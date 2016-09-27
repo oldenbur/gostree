@@ -2,7 +2,6 @@ package stree
 
 import (
 	"reflect"
-	"strings"
 )
 
 type FieldComparisonResult int
@@ -34,16 +33,21 @@ func (f FieldComparisonResult) String() string {
 
 type ComparisonResult map[string]FieldComparisonResult
 
-func (s STree) CompareTo(o STree) ComparisonResult {
+var errTracker error
+
+func (s STree) CompareTo(o STree) (ComparisonResult, error) {
 
 	result := map[string]FieldComparisonResult{}
 
 	for _, f := range s.FieldPaths() {
 
 		fStr := f.String()
-		valSubj := s.Val(fStr)
-		valObj := o.Val(fStr)
+		valSubj, err := s.Val(fStr)
+		if err != nil {
+			return nil, err
+		}
 
+		valObj, err := o.Val(fStr)
 		if valObj == nil {
 			result[fStr] = COMP_OBJECT_LACKS
 			continue
@@ -54,26 +58,22 @@ func (s STree) CompareTo(o STree) ComparisonResult {
 
 		if kindSubj != kindObj {
 			result[fStr] = COMP_TYPES_DIFFER
-		} else if isBool(kindSubj) {
-			result[fStr] = compResult(s.BoolVal(fStr) == o.BoolVal(fStr))
-		} else if isInt(kindSubj) || isUint(kindSubj) {
-			result[fStr] = compResult(s.IntVal(fStr) == o.IntVal(fStr))
-		} else if isFloat(kindSubj) {
-			result[fStr] = compResult(s.FloatVal(fStr) == o.FloatVal(fStr))
-		} else if isString(kindSubj) {
-			result[fStr] = compResult(strings.Compare(s.StrVal(fStr), o.StrVal(fStr)) == 0)
+		} else if valObj == valSubj {
+			result[fStr] = COMP_NO_DIFFERENCE
+		} else {
+			result[fStr] = COMP_VALUES_DIFFER
 		}
 
 	}
 
 	for _, f := range o.FieldPaths() {
 		fStr := f.String()
-		if s.Val(fStr) == nil {
+		if sVal, _ := s.Val(fStr); sVal == nil {
 			result[fStr] = COMP_SUBJECT_LACKS
 		}
 	}
 
-	return result
+	return result, nil
 }
 
 func compResult(cond bool) (r FieldComparisonResult) {

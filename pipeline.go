@@ -1,8 +1,8 @@
 package main
 
 import (
-	"sync"
 	"fmt"
+	"sync"
 )
 
 func main() {
@@ -87,5 +87,3 @@ func merge(done <-chan struct{}, cs ...<-chan int) <-chan int {
 	}()
 	return out
 }
-
-
