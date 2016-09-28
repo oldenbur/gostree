@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	log "github.com/cihub/seelog"
+	//	log "github.com/cihub/seelog"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -109,83 +109,6 @@ func findStructElemsPath(pre string, s interface{}, valsIn settingsMap) (vals se
 	return vals, nil
 }
 
-// isPrimitive returns true if the specified Kind represents a primitive
-// type, false otherwise.
-func isPrimitive(k reflect.Kind) bool {
-	return (k == reflect.Bool ||
-		k == reflect.Int ||
-		k == reflect.Int8 ||
-		k == reflect.Int16 ||
-		k == reflect.Int32 ||
-		k == reflect.Int64 ||
-		k == reflect.Uint ||
-		k == reflect.Uint8 ||
-		k == reflect.Uint16 ||
-		k == reflect.Uint32 ||
-		k == reflect.Uint64 ||
-		k == reflect.Uintptr ||
-		k == reflect.Float32 ||
-		k == reflect.Float64 ||
-		k == reflect.Complex64 ||
-		k == reflect.Complex128 ||
-		k == reflect.String)
-}
-
-func isBool(k reflect.Kind) bool {
-	return k == reflect.Bool
-}
-
-func isInt(k reflect.Kind) bool {
-	return (k == reflect.Int ||
-		k == reflect.Int8 ||
-		k == reflect.Int16 ||
-		k == reflect.Int32 ||
-		k == reflect.Int64)
-}
-
-func isUint(k reflect.Kind) bool {
-	return (k == reflect.Uint ||
-		k == reflect.Uint8 ||
-		k == reflect.Uint16 ||
-		k == reflect.Uint32 ||
-		k == reflect.Uint64)
-}
-
-func isFloat(k reflect.Kind) bool {
-	return (k == reflect.Uintptr ||
-		k == reflect.Float32 ||
-		k == reflect.Float64)
-}
-
-func isComplex(k reflect.Kind) bool {
-	return (k == reflect.Complex64 ||
-		k == reflect.Complex128)
-}
-
-func isString(k reflect.Kind) bool {
-	return k == reflect.String
-}
-
-func printVal(v reflect.Value) string {
-
-	switch v.Kind() {
-	case reflect.Bool:
-		return fmt.Sprintf("%t", v.Bool())
-	case reflect.String:
-		return v.String()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return fmt.Sprintf("%d", v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return fmt.Sprintf("%d", v.Uint())
-	case reflect.Float32, reflect.Float64:
-		return fmt.Sprintf("%f", v.Float())
-	case reflect.Complex64, reflect.Complex128:
-		return fmt.Sprintf("%+v", v.Complex())
-	default:
-		return fmt.Sprintf("<printVal: %v>", v)
-	}
-}
-
 // Keys returns a slice containing all top-level keys of this STree
 func (t STree) Keys() []interface{} {
 	keys := []interface{}{}
@@ -215,15 +138,14 @@ var keyRegexp *regexp.Regexp = regexp.MustCompile(`^(\w+)(?:\[(\d+)\])?$`)
 // Val returns the leaf value at the position specified by path,
 // which is a slash delimited list of nested keys in data, e.g.
 // level1/level2/key
-func (t STree) Val(path string) interface{} {
+func (t STree) Val(path string) (interface{}, error) {
 
 	keys := strings.Split(path, "/")
 	//	log.Debugf("Val(%s) - %T", path, t)
 
 	key_comps := keyRegexp.FindStringSubmatch(keys[0])
 	if key_comps == nil || len(key_comps) < 1 {
-		log.Warnf("val failed to parse key %s", keys[0])
-		return nil
+		return nil, fmt.Errorf("val failed to parse key %s", keys[0])
 	}
 
 	key := key_comps[1]
@@ -231,25 +153,24 @@ func (t STree) Val(path string) interface{} {
 	if len(key_comps[2]) > 0 {
 		i, err := strconv.Atoi(key_comps[2])
 		if err != nil || i < 0 {
-			log.Warnf("val failed to parse slice index %s", key_comps[1])
-			return nil
+			return nil, fmt.Errorf("val failed to parse slice index %s", key_comps[1])
 		}
 		idx = i
 	}
 
 	if len(keys) < 1 {
-		return nil
+		return nil, fmt.Errorf("no key remaining components")
 
 	} else if len(keys) == 1 && idx < 0 {
 		//		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
-		return t[key]
+		return t[key], nil
 
 	} else if data, ok := t[key].(STree); ok {
 		if idx >= 0 {
-			log.Warnf("Val unexpected index for STree value: %s", keys[0])
-			return nil
+			return nil, fmt.Errorf("Val unexpected index for STree value: %s", keys[0])
+		} else {
+			return data.Val(strings.Join(keys[1:], "/"))
 		}
-		return data.Val(strings.Join(keys[1:], "/"))
 
 	} else if data, ok := t[key].([]interface{}); ok {
 		// TODO: break this case out to recursively handle nested slices
@@ -257,91 +178,86 @@ func (t STree) Val(path string) interface{} {
 		if idx >= 0 && idx < len(data) {
 			result := data[idx]
 			if len(keys) < 2 {
-				return result
+				return result, nil
 			} else if sval, ok := result.(STree); ok {
 				return sval.Val(strings.Join(keys[1:], "/"))
 			}
 
 		} else if idx < 0 {
 			if len(keys) > 1 {
-				log.Warnf("Val requires index to traverse slice value for key: %s", keys[0])
-				return nil
+				return nil, fmt.Errorf("Val requires index to traverse slice value for key: %s", keys[0])
 			}
-			return data
+			return data, nil
 
 		} else {
-			log.Warnf("Val invalid slice key index: %s", keys[0])
-			return nil
+			return nil, fmt.Errorf("Val invalid slice key index: %s", keys[0])
 		}
 	}
 
-	log.Warnf("Val failed to produce value for key: %s", keys[0])
-	return nil
+	return nil, fmt.Errorf("Val failed to produce value for key: %s", keys[0])
 }
 
 // SVal returns the value stored in data at the path, converting it
 // to a a string, and returning the zero value if the string is not
 // found.
-func (t STree) StrVal(path string) (s string) {
-	v := t.Val(path)
+func (t STree) StrVal(path string) (string, error) {
+	v, err := t.Val(path)
 	if sval, ok := v.(string); ok {
-		s = sval
+		return sval, err
 	}
-	return
+	return "", err
 }
 
 // IntVal returns the value stored in data at the path, converting it
 // to an int64, and returning the zero value if the int is not found.
-func (t STree) IntVal(path string) (i int64) {
-	v := t.Val(path)
+func (t STree) IntVal(path string) (int64, error) {
+	v, err := t.Val(path)
 	if ival, ok := v.(int64); ok {
-		i64 := int64(ival)
-		i = i64
+		return int64(ival), err
 	} else if ival, ok := v.(float64); ok {
-		i64 := int64(ival)
-		i = i64
+		return int64(ival), err
 	}
-	return
+	return 0, err
 }
 
 // FloatVal returns the value stored in data at the path, converting it
 // to an int64, and returning the zero value if the value cannot be converted.
-func (t STree) FloatVal(path string) (f float64) {
-	v := t.Val(path)
+func (t STree) FloatVal(path string) (float64, error) {
+	v, err := t.Val(path)
 	if fval, ok := v.(float64); ok {
-		f = fval
+		return fval, err
 	}
-	return
+	return 0, err
 }
 
 // BVal returns the value stored in data at the path, converting it
 // to an bool, and returning the zero value if the bool is not found.
-func (t STree) BoolVal(path string) (b bool) {
-	v := t.Val(path)
+func (t STree) BoolVal(path string) (bool, error) {
+	v, err := t.Val(path)
 	if bval, ok := v.(bool); ok {
-		b = bval
+		return bval, err
 	}
-	return
+	return false, err
 }
 
-// TVal returns the value stored in data at the path, converting it
+// STreeVal returns the value stored in data at the path, converting it
 // to an STree and returning nil if the operation fails.
-func (t STree) STreeVal(path string) (s STree) {
-	v := t.Val(path)
+func (t STree) STreeVal(path string) (STree, error) {
+	v, err := t.Val(path)
 	if sval, ok := v.(STree); ok {
-		s = sval
+		return sval, err
 	}
-	return
+	return nil, err
 }
 
 // SliceVal returns the value stored in the STree at the path, converting
 // it to a []interface{} and returning nil if the operation fails.
-func (t STree) SliceVal(path string) (a []interface{}) {
-	v := t.Val(path)
+func (t STree) SliceVal(path string) ([]interface{}, error) {
+	v, err := t.Val(path)
 	if aval, ok := v.([]interface{}); ok {
-		a = aval
+		return aval, err
 	}
-	return
+	return nil, err
 }
 
 func ValueOf(v interface{}) (STree, error) {
