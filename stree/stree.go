@@ -21,11 +21,22 @@ type STree map[interface{}]interface{}
 type FieldPath []string
 
 func (p FieldPath) String() string {
-	return strings.Join([]string(p), "/")
+	return "." + strings.Join([]string(p), ".")
 }
 
-func ValueOfPath(p string) FieldPath {
-	return FieldPath(strings.Split(p, "/"))
+func (p FieldPath) shift() FieldPath {
+	if len(p) < 1 {
+		return FieldPath([]string{})
+	} else {
+		return p[1:]
+	}
+}
+
+func ValueOfPath(p string) (FieldPath, error) {
+	if !strings.HasPrefix(p, ".") {
+		return nil, fmt.Errorf("path %s lacks prefix .", p)
+	}
+	return FieldPath(strings.Split(strings.TrimLeft(p, "."), ".")), nil
 }
 
 // NewSTreeYaml reads yaml from the specified reader, parses it and returns
@@ -137,10 +148,13 @@ var keyRegexp *regexp.Regexp = regexp.MustCompile(`^(\w+)(?:\[(\d+)\])?$`)
 
 // Val returns the leaf value at the position specified by path,
 // which is a slash delimited list of nested keys in data, e.g.
-// level1/level2/key
+// .level1.level2.key
 func (t STree) Val(path string) (interface{}, error) {
 
-	keys := strings.Split(path, "/")
+	keys, err := ValueOfPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse path: %s", path)
+	}
 	//	log.Debugf("Val(%s) - %T", path, t)
 
 	key_comps := keyRegexp.FindStringSubmatch(keys[0])
@@ -169,7 +183,7 @@ func (t STree) Val(path string) (interface{}, error) {
 		if idx >= 0 {
 			return nil, fmt.Errorf("Val unexpected index for STree value: %s", keys[0])
 		} else {
-			return data.Val(strings.Join(keys[1:], "/"))
+			return data.Val(keys.shift().String())
 		}
 
 	} else if data, ok := t[key].([]interface{}); ok {
@@ -180,7 +194,7 @@ func (t STree) Val(path string) (interface{}, error) {
 			if len(keys) < 2 {
 				return result, nil
 			} else if sval, ok := result.(STree); ok {
-				return sval.Val(strings.Join(keys[1:], "/"))
+				return sval.Val(keys.shift().String())
 			}
 
 		} else if idx < 0 {
