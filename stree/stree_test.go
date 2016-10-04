@@ -50,12 +50,12 @@ func TestSTree(t *testing.T) {
 
 	Convey("Json tree access", t, func() {
 
-		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
+		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key.2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
 		So(err, ShouldBeNil)
 		v1, err := s.StrVal(".key1")
 		So(err, ShouldBeNil)
 		So(v1, ShouldEqual, "val1")
-		v2, err := s.IntVal(".key2")
+		v2, err := s.IntVal(`.key\.2`)
 		So(err, ShouldBeNil)
 		So(v2, ShouldEqual, 1234)
 		ss, err := s.STreeVal(".key3")
@@ -64,9 +64,9 @@ func TestSTree(t *testing.T) {
 		v4, err := s.BoolVal(".key3.key4")
 		So(err, ShouldBeNil)
 		So(v4, ShouldEqual, true)
-		v5, err := s.IntVal(".key3.key5")
+		v5, err := s.FloatVal(".key3.key5")
 		So(err, ShouldBeNil)
-		So(v5, ShouldEqual, -12)
+		So(v5, ShouldEqual, -12.34)
 
 		json, err := s.WriteJson(true)
 		So(err, ShouldBeNil)
@@ -158,52 +158,30 @@ comments: >
 		log.Debugf("out: %s", string(out))
 	})
 
-	Convey("ValueOfPath", t, func() {
+	Convey("escapeKeys\n", t, func() {
 
-		p, err := ValueOfPath(".key1")
+		s := STree(map[interface{}]interface{}{
+			"key.1": "val.1",
+			"key2":  1234,
+			"key3": STree(map[interface{}]interface{}{
+				"key4":  true,
+				"key.5": -12.34,
+			}),
+		})
+
+		sEsc, err := s.escapeKeys()
 		So(err, ShouldBeNil)
-		So(p, ShouldResemble, FieldPath{"key1"})
-	})
+		keys1, err := sEsc.KeyStrings()
+		So(err, ShouldBeNil)
+		So(len(keys1), ShouldEqual, 3)
+		So(keys1, ShouldContain, `key\.1`)
+		So(keys1, ShouldContain, `key2`)
+		So(keys1, ShouldContain, `key3`)
 
-//	Convey("FieldPaths", t, func() {
-//
-//		json := `{
-//	"key1": "val1",
-//	"key2": 1234,
-//	"key3": {
-//		"key4": true,
-//		"key5": -12.34,
-//		"key6": {
-//			"key7": [1, 2, 3]
-//		}
-//	}}`
-//
-//		s, err := NewSTreeJson(strings.NewReader(json))
-//		So(err, ShouldBeNil)
-//
-//		paths := s.FieldPaths()
-//		So(len(paths), ShouldEqual, 5)
-//		for i, path := range paths {
-//			log.Debugf("path[%d] = %s", i, path)
-//		}
-//		pathsCheck := []FieldPath{
-//			ValueOfPath("key1"),
-//			ValueOfPath("key2"),
-//			ValueOfPath("key3/key4"),
-//			ValueOfPath("key3/key5"),
-//			ValueOfPath("key3/key6/key7"),
-//		}
-//		var m map[string]bool = make(map[string]bool)
-//		for _, path := range pathsCheck {
-//			m[path.String()] = false
-//		}
-//		for _, path := range paths {
-//			m[path.String()] = true
-//		}
-//		So(len(m), ShouldEqual, len(pathsCheck))
-//		for _, v := range m {
-//			So(v, ShouldBeTrue)
-//		}
-//	})
+		sSubEsc, err := sEsc.STreeVal(`.key3`)
+		So(err, ShouldBeNil)
+		So(sSubEsc, ShouldNotBeNil)
+		So(sSubEsc, ShouldResemble, STree(map[interface{}]interface{}{`key4`: true, `key\.5`: -12.34}))
+	})
 
 }

@@ -4,40 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	log "github.com/cihub/seelog"
+	yaml "gopkg.in/yaml.v2"
 	"io"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
-
-	//	log "github.com/cihub/seelog"
-	yaml "gopkg.in/yaml.v2"
 )
 
 type settingsMap map[string]*reflect.Value
 
 type STree map[interface{}]interface{}
-
-type FieldPath []string
-
-func (p FieldPath) String() string {
-	return "." + strings.Join([]string(p), ".")
-}
-
-func (p FieldPath) shift() FieldPath {
-	if len(p) < 1 {
-		return FieldPath([]string{})
-	} else {
-		return p[1:]
-	}
-}
-
-func ValueOfPath(p string) (FieldPath, error) {
-	if !strings.HasPrefix(p, ".") {
-		return nil, fmt.Errorf("path %s lacks prefix .", p)
-	}
-	return FieldPath(strings.Split(strings.TrimLeft(p, "."), ".")), nil
-}
 
 // NewSTreeYaml reads yaml from the specified reader, parses it and returns
 // the structure as an STree.
@@ -112,7 +90,7 @@ func findStructElemsPath(pre string, s interface{}, valsIn settingsMap) (vals se
 
 		f := r.Field(i)
 
-		if isPrimitive(f.Kind()) {
+		if isPrimitiveKind(f.Kind()) {
 			vals[rType.Field(i).Name] = &f
 		}
 	}
@@ -144,7 +122,7 @@ func (t STree) KeyStrings() ([]string, error) {
 }
 
 // keyRegexp matches strings of the form key_name or slice_name[123]
-var keyRegexp *regexp.Regexp = regexp.MustCompile(`^(\w+)(?:\[(\d+)\])?$`)
+var keyRegexp *regexp.Regexp = regexp.MustCompile(`^([^\[\]]+)(?:\[(\d+)\])?$`)
 
 // Val returns the leaf value at the position specified by path,
 // which is a slash delimited list of nested keys in data, e.g.
@@ -155,11 +133,11 @@ func (t STree) Val(path string) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse path: %s", path)
 	}
-	//	log.Debugf("Val(%s) - %T", path, t)
+	keyCur := keys.next()
 
-	key_comps := keyRegexp.FindStringSubmatch(keys[0])
+	key_comps := keyRegexp.FindStringSubmatch(keyCur)
 	if key_comps == nil || len(key_comps) < 1 {
-		return nil, fmt.Errorf("val failed to parse key %s", keys[0])
+		return nil, fmt.Errorf("val failed to parse key %s in STree %q", keyCur, t)
 	}
 
 	key := key_comps[1]
@@ -181,7 +159,7 @@ func (t STree) Val(path string) (interface{}, error) {
 
 	} else if data, ok := t[key].(STree); ok {
 		if idx >= 0 {
-			return nil, fmt.Errorf("Val unexpected index for STree value: %s", keys[0])
+			return nil, fmt.Errorf("Val unexpected index for STree value: %s", keyCur)
 		} else {
 			return data.Val(keys.shift().String())
 		}
@@ -199,16 +177,16 @@ func (t STree) Val(path string) (interface{}, error) {
 
 		} else if idx < 0 {
 			if len(keys) > 1 {
-				return nil, fmt.Errorf("Val requires index to traverse slice value for key: %s", keys[0])
+				return nil, fmt.Errorf("Val requires index to traverse slice value for key: %s", keyCur)
 			}
 			return data, nil
 
 		} else {
-			return nil, fmt.Errorf("Val invalid slice key index: %s", keys[0])
+			return nil, fmt.Errorf("Val invalid slice key index: %s", keyCur)
 		}
 	}
 
-	return nil, fmt.Errorf("Val failed to produce value for key: %s", keys[0])
+	return nil, fmt.Errorf("Val failed to produce value for key: %s", keyCur)
 }
 
 // SVal returns the value stored in data at the path, converting it
@@ -219,7 +197,7 @@ func (t STree) StrVal(path string) (string, error) {
 	if sval, ok := v.(string); ok {
 		return sval, err
 	}
-	return "", err
+	return "", fmt.Errorf("StrVal found unexpected value type %T for path '%s'", v, path)
 }
 
 // IntVal returns the value stored in data at the path, converting it
@@ -231,7 +209,7 @@ func (t STree) IntVal(path string) (int64, error) {
 	} else if ival, ok := v.(float64); ok {
 		return int64(ival), err
 	}
-	return 0, err
+	return 0, fmt.Errorf("IntVal found unexpected value type %T for path '%s'", v, path)
 }
 
 // FloatVal returns the value stored in data at the path, converting it
@@ -241,7 +219,7 @@ func (t STree) FloatVal(path string) (float64, error) {
 	if fval, ok := v.(float64); ok {
 		return fval, err
 	}
-	return 0, err
+	return 0, fmt.Errorf("FloatVal found unexpected value type %T for path '%s'", v, path)
 }
 
 // BVal returns the value stored in data at the path, converting it
@@ -251,7 +229,7 @@ func (t STree) BoolVal(path string) (bool, error) {
 	if bval, ok := v.(bool); ok {
 		return bval, err
 	}
-	return false, err
+	return false, fmt.Errorf("BoolVal found unexpected value type %T for path '%s'", v, path)
 }
 
 // STreeVal returns the value stored in data at the path, converting it
@@ -261,7 +239,7 @@ func (t STree) STreeVal(path string) (STree, error) {
 	if sval, ok := v.(STree); ok {
 		return sval, err
 	}
-	return nil, err
+	return nil, fmt.Errorf("STreeVal found unexpected value type %T for path '%s'", v, path)
 }
 
 // SliceVal returns the value stored in the STree at the path, converting
@@ -271,7 +249,7 @@ func (t STree) SliceVal(path string) ([]interface{}, error) {
 	if aval, ok := v.([]interface{}); ok {
 		return aval, err
 	}
-	return nil, err
+	return nil, fmt.Errorf("SliceVal found unexpected value type %T for path '%s'", v, path)
 }
 
 func ValueOf(v interface{}) (STree, error) {
@@ -306,7 +284,7 @@ func convertVal(v interface{}) (interface{}, error) {
 	var result interface{}
 
 	val := reflect.ValueOf(v)
-	if isPrimitive(val.Kind()) {
+	if isPrimitiveKind(val.Kind()) {
 		result = v
 
 	} else if vSlice, ok := v.([]interface{}); ok {
@@ -350,10 +328,10 @@ func (s STree) unconvertKeys() (map[string]interface{}, error) {
 		}
 
 		val := reflect.ValueOf(v)
-		if isPrimitive(val.Kind()) {
+		if isPrimitiveKind(val.Kind()) {
 			result[kStr] = v
 		} else if /*vSlice*/ _, ok := v.([]interface{}); ok {
-			// leave array items out for now
+			// TODO: handle array items
 		} else if sVal, ok := v.(STree); ok {
 			cVal, err := sVal.unconvertKeys()
 			if err != nil {
@@ -368,26 +346,35 @@ func (s STree) unconvertKeys() (map[string]interface{}, error) {
 	return result, nil
 }
 
-// FieldPaths returns a slice of FieldPaths representing the list of full key paths to
-// each "leaf" of the STree.
-func (s STree) FieldPaths() (paths []FieldPath) {
-	return s.fieldPaths([]string{}, paths)
-}
+// escapeKeys traverses the STree and replaces all instances of the '.' character
+// in keys with "\."
+// TODO: escape [ and ]
+func (s STree) escapeKeys() (STree, error) {
 
-func (s STree) fieldPaths(parent FieldPath, tally []FieldPath) (paths []FieldPath) {
+	result := make(STree)
+
 	for k, v := range s {
-		var path FieldPath
-		if f, ok := k.(string); ok {
-			path = append(parent, f)
+
+		var kEsc string
+		if kStr, ok := k.(string); !ok {
+			return result, fmt.Errorf("escapeKeys failed to convert key: %v", k)
 		} else {
-			panic(fmt.Sprintf("fieldPaths failed to convert STree k '%v' to Field", k))
+			kEsc = strings.Replace(kStr, `.`, `\.`, -1)
+			log.Debugf("escapeKeys: %s -> %s", k, kEsc)
 		}
 
-		if vs, err := ValueOf(v); err == nil {
-			tally = vs.fieldPaths(path, tally)
+		if sVal, ok := v.(STree); ok {
+			sEsc, err := sVal.escapeKeys()
+			if err != nil {
+				return result, err
+			}
+			result[kEsc] = sEsc
+		} else if /*vSlice*/ _, ok := v.([]interface{}); ok {
+			// TODO: handle array items
 		} else {
-			tally = append(tally, path)
+			result[kEsc] = s[k]
 		}
 	}
-	return tally
+
+	return result, nil
 }
