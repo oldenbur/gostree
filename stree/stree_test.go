@@ -158,30 +158,4 @@ comments: >
 		log.Debugf("out: %s", string(out))
 	})
 
-	Convey("escapeKeys\n", t, func() {
-
-		s := STree(map[interface{}]interface{}{
-			"key.1": "val.1",
-			"key2":  1234,
-			"key3": STree(map[interface{}]interface{}{
-				"key4":  true,
-				"key.5": -12.34,
-			}),
-		})
-
-		sEsc, err := s.escapeKeys()
-		So(err, ShouldBeNil)
-		keys1, err := sEsc.KeyStrings()
-		So(err, ShouldBeNil)
-		So(len(keys1), ShouldEqual, 3)
-		So(keys1, ShouldContain, `key\.1`)
-		So(keys1, ShouldContain, `key2`)
-		So(keys1, ShouldContain, `key3`)
-
-		sSubEsc, err := sEsc.STreeVal(`.key3`)
-		So(err, ShouldBeNil)
-		So(sSubEsc, ShouldNotBeNil)
-		So(sSubEsc, ShouldResemble, STree(map[interface{}]interface{}{`key4`: true, `key\.5`: -12.34}))
-	})
-
 }

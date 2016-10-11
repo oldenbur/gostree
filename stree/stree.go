@@ -4,13 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	log "github.com/cihub/seelog"
 	yaml "gopkg.in/yaml.v2"
 	"io"
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 )
 
 type settingsMap map[string]*reflect.Value
@@ -169,7 +167,7 @@ func (t STree) Val(path string) (interface{}, error) {
 		//		log.Debugf("Val(%s) - slice: %v", path, data)
 		if idx >= 0 && idx < len(data) {
 			result := data[idx]
-			if len(keys) < 2 {
+			if len(keys) <= 1 {
 				return result, nil
 			} else if sval, ok := result.(STree); ok {
 				return sval.Val(keys.shift().String())
@@ -182,7 +180,7 @@ func (t STree) Val(path string) (interface{}, error) {
 			return data, nil
 
 		} else {
-			return nil, fmt.Errorf("Val invalid slice key index: %s", keyCur)
+			return nil, fmt.Errorf("Val slice key index out of range [0,%d]: %s", len(data)-1, keyCur)
 		}
 	}
 
@@ -252,6 +250,9 @@ func (t STree) SliceVal(path string) ([]interface{}, error) {
 	return nil, fmt.Errorf("SliceVal found unexpected value type %T for path '%s'", v, path)
 }
 
+// ValueOf assumes that the specified value is convertable to map[interface{}]interface{}
+// and otherwise upholds the invariants of an STree structure. It's value as an STree
+// is returned.
 func ValueOf(v interface{}) (STree, error) {
 	if sval, ok := v.(STree); ok {
 		return sval, nil
@@ -340,39 +341,6 @@ func (s STree) unconvertKeys() (map[string]interface{}, error) {
 			result[kStr] = interface{}(cVal)
 		} else {
 			return nil, fmt.Errorf("unconvertKeys unexpected type case")
-		}
-	}
-
-	return result, nil
-}
-
-// escapeKeys traverses the STree and replaces all instances of the '.' character
-// in keys with "\."
-// TODO: escape [ and ]
-func (s STree) escapeKeys() (STree, error) {
-
-	result := make(STree)
-
-	for k, v := range s {
-
-		var kEsc string
-		if kStr, ok := k.(string); !ok {
-			return result, fmt.Errorf("escapeKeys failed to convert key: %v", k)
-		} else {
-			kEsc = strings.Replace(kStr, `.`, `\.`, -1)
-			log.Debugf("escapeKeys: %s -> %s", k, kEsc)
-		}
-
-		if sVal, ok := v.(STree); ok {
-			sEsc, err := sVal.escapeKeys()
-			if err != nil {
-				return result, err
-			}
-			result[kEsc] = sEsc
-		} else if /*vSlice*/ _, ok := v.([]interface{}); ok {
-			// TODO: handle array items
-		} else {
-			result[kEsc] = s[k]
 		}
 	}
 

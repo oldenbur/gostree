@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	//	log "github.com/cihub/seelog"
 )
 
 type FieldPath []string
@@ -68,13 +70,29 @@ func (s STree) FieldPaths() (paths []FieldPath) {
 	return s.fieldPaths([]string{}, paths)
 }
 
-func (s STree) fieldPaths(parent FieldPath, tally []FieldPath) (paths []FieldPath) {
+func (s STree) fieldPaths(parent FieldPath, tally []FieldPath) []FieldPath {
 	for k, v := range s {
+
+		var f string
 		var path FieldPath
-		if f, ok := k.(string); ok {
-			path = append(parent, f)
+		if fVal, ok := k.(string); ok {
+			f = fVal
 		} else {
 			panic(fmt.Sprintf("fieldPaths failed to convert STree k '%v' to Field", k))
+		}
+
+		if !IsSlice(v) {
+			path = append(parent, f)
+		} else {
+			for i, vi := range v.([]interface{}) {
+				path = append(parent, fmt.Sprintf("%s[%d]", f, i))
+				if vs, err := ValueOf(vi); err == nil {
+					tally = vs.fieldPaths(path, tally)
+				} else {
+					tally = append(tally, path)
+				}
+			}
+			continue
 		}
 
 		if vs, err := ValueOf(v); err == nil {
