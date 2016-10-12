@@ -96,6 +96,12 @@ func findStructElemsPath(pre string, s interface{}, valsIn settingsMap) (vals se
 	return vals, nil
 }
 
+// Size returns the number of leaf entries in the STree
+// TODO: cache keys?
+func (t STree) Size() int {
+	return len(t.Keys())
+}
+
 // Keys returns a slice containing all top-level keys of this STree
 func (t STree) Keys() []interface{} {
 	keys := []interface{}{}
