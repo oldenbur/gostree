@@ -84,19 +84,27 @@ func (s STree) fieldPaths(parent FieldPath, tally []FieldPath) []FieldPath {
 		if !IsSlice(v) {
 			path = append(parent, f)
 		} else {
-			for i, vi := range v.([]interface{}) {
-				path = append(parent, fmt.Sprintf("%s[%d]", f, i))
-				if vs, err := ValueOf(vi); err == nil {
-					tally = vs.fieldPaths(path, tally)
-				} else {
-					tally = append(tally, path)
-				}
-			}
+			tally = fieldPathsSlice(parent, tally, f, v)
 			continue
 		}
 
 		if vs, err := ValueOf(v); err == nil {
 			tally = vs.fieldPaths(path, tally)
+		} else {
+			tally = append(tally, path)
+		}
+	}
+	return tally
+}
+
+func fieldPathsSlice(parent FieldPath, tally []FieldPath, key string, val interface{}) []FieldPath {
+	for i, vi := range val.([]interface{}) {
+		keySub := fmt.Sprintf("%s[%d]", key, i)
+		path := append(parent, keySub)
+		if vs, err := ValueOf(vi); err == nil {
+			tally = vs.fieldPaths(path, tally)
+		} else if IsSlice(vi) {
+			tally = fieldPathsSlice(parent, tally, keySub, vi)
 		} else {
 			tally = append(tally, path)
 		}

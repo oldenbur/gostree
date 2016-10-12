@@ -98,20 +98,43 @@ func TestSTreeFieldPaths(t *testing.T) {
 			ValueOfPathMust(`.key2[2].key5[2]`),
 		})
 	})
+
+	Convey("FieldPaths with nested slice", t, func() {
+
+		json := `{
+			"key1": [
+				[1, [2, 3, 4], 3],
+				4,
+				{
+					"key2": -12.34,
+					"key3": ["a", ["b"], "c"]
+				}
+			]
+		}`
+
+		s, err := NewSTreeJson(strings.NewReader(json))
+		So(err, ShouldBeNil)
+
+		paths := s.FieldPaths()
+		verifyPaths(paths, []FieldPath{
+			ValueOfPathMust(`.key1[0][0]`),
+			ValueOfPathMust(`.key1[0][1][0]`),
+			ValueOfPathMust(`.key1[0][1][1]`),
+			ValueOfPathMust(`.key1[0][1][2]`),
+			ValueOfPathMust(`.key1[0][2]`),
+			ValueOfPathMust(`.key1[1]`),
+			ValueOfPathMust(`.key1[2].key2`),
+			ValueOfPathMust(`.key1[2].key3[0]`),
+			ValueOfPathMust(`.key1[2].key3[1][0]`),
+			ValueOfPathMust(`.key1[2].key3[2]`),
+		})
+	})
 }
 
 func verifyPaths(paths, pathsCheck []FieldPath) {
 	if len(paths) != len(pathsCheck) {
-		log.Debug("paths:")
-		sort.Sort(FieldPaths(paths))
-		for _, p := range paths {
-			log.Debug("  ", p)
-		}
-		log.Debug("pathsCheck:")
-		sort.Sort(FieldPaths(pathsCheck))
-		for _, p := range pathsCheck {
-			log.Debug("  ", p)
-		}
+		printSorted("paths", paths)
+		printSorted("pathsCheck", pathsCheck)
 	}
 	So(len(paths), ShouldEqual, len(pathsCheck))
 	var m map[string]bool = make(map[string]bool)
@@ -124,10 +147,18 @@ func verifyPaths(paths, pathsCheck []FieldPath) {
 	So(len(m), ShouldEqual, len(pathsCheck))
 	for _, v := range m {
 		if !v {
-			log.Debugf("paths: %v", paths)
-			log.Debugf("pathsCheck: %v", pathsCheck)
+			printSorted("paths", paths)
+			printSorted("pathsCheck", pathsCheck)
 		}
 		So(v, ShouldBeTrue)
+	}
+}
+
+func printSorted(msg string, paths []FieldPath) {
+	log.Debug("paths")
+	sort.Sort(FieldPaths(paths))
+	for _, p := range paths {
+		log.Debug("  ", p)
 	}
 }
 
