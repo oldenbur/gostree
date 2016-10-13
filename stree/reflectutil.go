@@ -87,6 +87,10 @@ func IsSlice(i interface{}) bool {
 	return (reflect.ValueOf(i).Kind() == reflect.Slice)
 }
 
+func PrintValue(i interface{}) string {
+	return printValue(reflect.ValueOf(i))
+}
+
 func printValue(v reflect.Value) string {
 
 	switch v.Kind() {
