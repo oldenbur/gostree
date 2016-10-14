@@ -128,9 +128,9 @@ func (t STree) KeyStrings() ([]string, error) {
 // keyRegexp matches strings of the form key_name or slice_name[123]
 var keyRegexp *regexp.Regexp = regexp.MustCompile(`^([^\[\]]+)(?:\[(\d+)\])?$`)
 
-// Val returns the leaf value at the position specified by path,
-// which is a slash delimited list of nested keys in data, e.g.
-// .level1.level2.key
+// Val returns the leaf value at the position specified by path, which is a slash delimited
+// list of nested keys in data, e.g. .level1.level2.key. If the key does not exist, an error
+// is returned.
 func (t STree) Val(path string) (interface{}, error) {
 
 	keys, err := ValueOfPath(path)
@@ -159,7 +159,11 @@ func (t STree) Val(path string) (interface{}, error) {
 
 	} else if len(keys) == 1 && idx < 0 {
 		//		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
-		return t[key], nil
+		if val, ok := t[key]; !ok {
+			return nil, fmt.Errorf("Val item not found at key %s", key)
+		} else {
+			return val, nil
+		}
 
 	} else if data, ok := t[key].(STree); ok {
 		if idx >= 0 {

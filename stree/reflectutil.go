@@ -88,7 +88,11 @@ func IsSlice(i interface{}) bool {
 }
 
 func PrintValue(i interface{}) string {
-	return printValue(reflect.ValueOf(i))
+	if i == nil {
+		return "nil"
+	} else {
+		return printValue(reflect.ValueOf(i))
+	}
 }
 
 func printValue(v reflect.Value) string {
