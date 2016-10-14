@@ -50,23 +50,23 @@ func TestSTree(t *testing.T) {
 
 	Convey("Json tree access", t, func() {
 
-		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
+		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key.2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
 		So(err, ShouldBeNil)
-		v1, err := s.StrVal("key1")
+		v1, err := s.StrVal(".key1")
 		So(err, ShouldBeNil)
 		So(v1, ShouldEqual, "val1")
-		v2, err := s.IntVal("key2")
+		v2, err := s.IntVal(`.key\.2`)
 		So(err, ShouldBeNil)
 		So(v2, ShouldEqual, 1234)
-		ss, err := s.STreeVal("key3")
+		ss, err := s.STreeVal(".key3")
 		So(err, ShouldBeNil)
 		So(len(ss), ShouldEqual, 2)
-		v4, err := s.BoolVal("key3/key4")
+		v4, err := s.BoolVal(".key3.key4")
 		So(err, ShouldBeNil)
 		So(v4, ShouldEqual, true)
-		v5, err := s.IntVal("key3/key5")
+		v5, err := s.FloatVal(".key3.key5")
 		So(err, ShouldBeNil)
-		So(v5, ShouldEqual, -12)
+		So(v5, ShouldEqual, -12.34)
 
 		json, err := s.WriteJson(true)
 		So(err, ShouldBeNil)
@@ -109,18 +109,18 @@ func TestSTree(t *testing.T) {
 		sj, err := s.WriteJson(true)
 		So(err, ShouldBeNil)
 		log.Debugf("s json: %s", string(sj))
-		sl1, err := s.SliceVal("a")
+		sl1, err := s.SliceVal(".a")
 		So(err, ShouldBeNil)
 		So(len(sl1), ShouldEqual, 2)
-		vd, err := s.StrVal("a[0]/d")
+		vd, err := s.StrVal(".a[0].d")
 		So(err, ShouldBeNil)
 		So(vd, ShouldEqual, "DDD")
-		a1v, err := s.IntVal("a[1]")
+		a1v, err := s.IntVal(".a[1]")
 		So(err, ShouldBeNil)
 		So(a1v, ShouldEqual, 19)
-		st1, err := s.STreeVal("a[0]")
+		st1, err := s.STreeVal(".a[0]")
 		So(err, ShouldBeNil)
-		st1v, err := st1.IntVal("b")
+		st1v, err := st1.IntVal(".b")
 		So(err, ShouldBeNil)
 		So(st1v, ShouldEqual, 1)
 		st1j, err := st1.WriteJson(true)
@@ -156,47 +156,6 @@ comments: >
 		out, err := s.WriteYaml()
 		So(err, ShouldBeNil)
 		log.Debugf("out: %s", string(out))
-	})
-
-	Convey("FieldPaths", t, func() {
-
-		json := `{
-	"key1": "val1",
-	"key2": 1234,
-	"key3": {
-		"key4": true,
-		"key5": -12.34,
-		"key6": {
-			"key7": [1, 2, 3]
-		}
-	}}`
-
-		s, err := NewSTreeJson(strings.NewReader(json))
-		So(err, ShouldBeNil)
-
-		paths := s.FieldPaths()
-		So(len(paths), ShouldEqual, 5)
-		for i, path := range paths {
-			log.Debugf("path[%d] = %s", i, path)
-		}
-		pathsCheck := []FieldPath{
-			ValueOfPath("key1"),
-			ValueOfPath("key2"),
-			ValueOfPath("key3/key4"),
-			ValueOfPath("key3/key5"),
-			ValueOfPath("key3/key6/key7"),
-		}
-		var m map[string]bool = make(map[string]bool)
-		for _, path := range pathsCheck {
-			m[path.String()] = false
-		}
-		for _, path := range paths {
-			m[path.String()] = true
-		}
-		So(len(m), ShouldEqual, len(pathsCheck))
-		for _, v := range m {
-			So(v, ShouldBeTrue)
-		}
 	})
 
 }

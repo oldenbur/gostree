@@ -2,13 +2,13 @@ package stree
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
 	"path"
 	"runtime"
 
 	log "github.com/cihub/seelog"
+	"github.com/go-errors/errors"
 )
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567789=!@#$%^&*()_+~`;:' ")
@@ -71,4 +71,8 @@ func InitTestLogger() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func Errorf(format string, a ...interface{}) error {
+	return errors.New(log.Errorf(format, a...))
 }
