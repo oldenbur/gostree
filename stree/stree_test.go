@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	log "github.com/cihub/seelog"
+	T "github.com/oldenbur/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func init() { InitTestLogger() }
+func init() { T.ConfigureTestLogger() }
 
 func TestSTree(t *testing.T) {
 

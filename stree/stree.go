@@ -197,6 +197,14 @@ func (t STree) Val(path string) (interface{}, error) {
 	return nil, fmt.Errorf("Val failed to produce value for key: %s", keyCur)
 }
 
+func (t STree) ValMust(path string) (interface{}, error) {
+	val, err := t.Val(path)
+	if err != nil {
+		panic(err)
+	}
+	return val, nil
+}
+
 // SVal returns the value stored in data at the path, converting it
 // to a a string, and returning the zero value if the string is not
 // found.
@@ -206,6 +214,14 @@ func (t STree) StrVal(path string) (string, error) {
 		return sval, err
 	}
 	return "", fmt.Errorf("StrVal found unexpected value type %T for path '%s'", v, path)
+}
+
+func (t STree) StrValMust(path string) string {
+	v, err := t.StrVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // IntVal returns the value stored in data at the path, converting it
@@ -220,6 +236,14 @@ func (t STree) IntVal(path string) (int64, error) {
 	return 0, fmt.Errorf("IntVal found unexpected value type %T for path '%s'", v, path)
 }
 
+func (t STree) IntValMust(path string) int64 {
+	v, err := t.IntVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // FloatVal returns the value stored in data at the path, converting it
 // to an int64, and returning the zero value if the value cannot be converted.
 func (t STree) FloatVal(path string) (float64, error) {
@@ -228,6 +252,14 @@ func (t STree) FloatVal(path string) (float64, error) {
 		return fval, err
 	}
 	return 0, fmt.Errorf("FloatVal found unexpected value type %T for path '%s'", v, path)
+}
+
+func (t STree) FloatValMust(path string) float64 {
+	v, err := t.FloatVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // BVal returns the value stored in data at the path, converting it
@@ -240,6 +272,14 @@ func (t STree) BoolVal(path string) (bool, error) {
 	return false, fmt.Errorf("BoolVal found unexpected value type %T for path '%s'", v, path)
 }
 
+func (t STree) BoolValMust(path string) bool {
+	v, err := t.BoolVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // STreeVal returns the value stored in data at the path, converting it
 // to an STree and returning nil if the operation fails.
 func (t STree) STreeVal(path string) (STree, error) {
@@ -250,6 +290,14 @@ func (t STree) STreeVal(path string) (STree, error) {
 	return nil, fmt.Errorf("STreeVal found unexpected value type %T for path '%s'", v, path)
 }
 
+func (t STree) STreeValMust(path string) STree {
+	v, err := t.STreeVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
 // SliceVal returns the value stored in the STree at the path, converting
 // it to a []interface{} and returning nil if the operation fails.
 func (t STree) SliceVal(path string) ([]interface{}, error) {
@@ -258,6 +306,14 @@ func (t STree) SliceVal(path string) ([]interface{}, error) {
 		return aval, err
 	}
 	return nil, fmt.Errorf("SliceVal found unexpected value type %T for path '%s'", v, path)
+}
+
+func (t STree) SliceValMust(path string) []interface{} {
+	v, err := t.SliceVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // ValueOf assumes that the specified value is convertable to map[interface{}]interface{}
