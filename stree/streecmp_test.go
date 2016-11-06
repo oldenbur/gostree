@@ -5,11 +5,10 @@ import (
 	"testing"
 
 	"fmt"
-	T "github.com/oldenbur/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func init() { T.ConfigureTestLogger() }
+func init() { configureTestLogger() }
 
 func TestSTreeCmp(t *testing.T) {
 
