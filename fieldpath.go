@@ -1,10 +1,9 @@
-package stree
+package gostree
 
 import (
 	"fmt"
 	"regexp"
 	"strings"
-
 	//	log "github.com/cihub/seelog"
 )
 

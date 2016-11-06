@@ -1,4 +1,4 @@
-package stree
+package gostree
 
 import (
 	"bytes"
