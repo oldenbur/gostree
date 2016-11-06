@@ -1,15 +1,15 @@
 package stree
 
 import (
+	"sort"
 	"strings"
 	"testing"
 
 	log "github.com/cihub/seelog"
 	. "github.com/smartystreets/goconvey/convey"
-	"sort"
 )
 
-func init() { InitTestLogger() }
+func init() { configureTestLogger() }
 
 func TestSTreeFieldPaths(t *testing.T) {
 

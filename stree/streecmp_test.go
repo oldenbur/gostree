@@ -8,7 +8,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func init() { InitTestLogger() }
+func init() { configureTestLogger() }
 
 func TestSTreeCmp(t *testing.T) {
 
