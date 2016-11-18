@@ -139,20 +139,7 @@ func (t STree) Val(path string) (interface{}, error) {
 	}
 	keyCur := keys.next()
 
-	key_comps := keyRegexp.FindStringSubmatch(keyCur)
-	if key_comps == nil || len(key_comps) < 1 {
-		return nil, fmt.Errorf("val failed to parse key %s in STree %q", keyCur, t)
-	}
-
-	key := key_comps[1]
-	idx := -1
-	if len(key_comps[2]) > 0 {
-		i, err := strconv.Atoi(key_comps[2])
-		if err != nil || i < 0 {
-			return nil, fmt.Errorf("val failed to parse slice index %s", key_comps[1])
-		}
-		idx = i
-	}
+	key, idx, err := t.parsePathComponent(keyCur)
 
 	if len(keys) < 1 {
 		return nil, fmt.Errorf("no key remaining components")
@@ -160,7 +147,7 @@ func (t STree) Val(path string) (interface{}, error) {
 	} else if len(keys) == 1 && idx < 0 {
 		//		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
 		if val, ok := t[key]; !ok {
-			return nil, fmt.Errorf("Val item not found at key %s", key)
+			return nil, fmt.Errorf("Val item not found at key %s", keyCur)
 		} else {
 			return val, nil
 		}
@@ -229,6 +216,8 @@ func (t STree) StrValMust(path string) string {
 func (t STree) IntVal(path string) (int64, error) {
 	v, err := t.Val(path)
 	if ival, ok := v.(int64); ok {
+		return int64(ival), err
+	} else if ival, ok := v.(int); ok {
 		return int64(ival), err
 	} else if ival, ok := v.(float64); ok {
 		return int64(ival), err
@@ -411,4 +400,27 @@ func (s STree) unconvertKeys() (map[string]interface{}, error) {
 	}
 
 	return result, nil
+}
+
+// parsePathComponent parses the input as a stree key with an optional subscript
+// index, e.g. "streeKey" or "treeList[2]". The key component and subscript index
+// is returned, with -1 denoting no subscript present.
+func (s STree) parsePathComponent(c string) (string, int, error) {
+
+	path_comps := keyRegexp.FindStringSubmatch(c)
+	if path_comps == nil || len(path_comps) < 1 {
+		return "", -1, fmt.Errorf("parsePathComponent failed to parse path component %s", c)
+	}
+
+	path := path_comps[1]
+	idx := -1
+	if len(path_comps[2]) > 0 {
+		i, err := strconv.Atoi(path_comps[2])
+		if err != nil || i < 0 {
+			return "", -1, fmt.Errorf("parsePathComponent failed to parse slice index %s from %s", path_comps[2], c)
+		}
+		idx = i
+	}
+
+	return path, idx, nil
 }

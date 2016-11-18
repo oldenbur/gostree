@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"fmt"
+	"github.com/smartystreets/assertions/should"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -77,7 +78,7 @@ func TestSTreeCmp(t *testing.T) {
 }
 
 func checkComparison(cmp ComparisonResult, key string, res FieldComparisonResult) {
-	So(cmp, ShouldContainKey, key)
+	So(cmp, should.ContainKey, key)
 	chk, _ := cmp[key]
 	So(fmt.Sprintf("%s %s", key, chk), ShouldEqual, fmt.Sprintf("%s %s", key, res))
 }
