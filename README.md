@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/oldenbur/gostree.svg?branch=master)](https://travis-ci.org/oldenbur/gostree)
 
-gostree is a utility written in pure [Go](https://golang.org/) for navigating string-indexed trees of unmarshalled yaml and json. A primary use case is for handling of json or yaml that does not have a pre-defined structure. For example, to ingest an arbitrary b-tree structure:
+gostree is a utility written in [Go](https://golang.org/) for navigating string-indexed trees of unmarshalled yaml and json. A primary use case is to handle json or yaml that does not have a pre-defined structure. For example, to ingest an arbitrary b-tree structure:
 ```go
 yaml := `
 ---
@@ -44,12 +44,12 @@ n := newBnode(keys[0], t.STreeValMust(AsPath(keys[0])))
 
 ### Marshaling and Unmarshaling
 
-An STree can be created from either json or yaml using one of the following to functions:
+An STree can be created from either json or yaml using one of the following:
 ```
     func NewSTreeJson(r io.Reader) (stree STree, err error)
     func NewSTreeYaml(r io.Reader) (stree STree, err error)
 ```
-An STree can be marshaled using one of the following:
+An STree can be marshaled to either json or yaml using one of the following:
 ```
     func (s STree) WriteJson(pretty bool) ([]byte, error)
     func (s STree) WriteYaml() ([]byte, error)
@@ -57,7 +57,7 @@ An STree can be marshaled using one of the following:
 
 ### Value Access and Key Syntax
 
-Once created, an element anywhere within an STree can be accessed using a syntax similar to that of the [jq](https://stedolan.github.io/jq/) tool. For example:
+Once created, an element anywhere within an STree can be accessed using a path which is a simplified version of the syntax used by the [jq](https://stedolan.github.io/jq/) tool. For example:
 ```go
 json := `
 {
