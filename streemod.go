@@ -70,7 +70,7 @@ func (t STree) setPathVal(path FieldPath, val interface{}) (STree, error) {
 		return t, nil
 	}
 
-	log.Debugf("setPathVal(%v) on %v", path[1:], tVal)
+	log.Tracef("setPathVal(%v) on %v", path[1:], tVal)
 
 	if IsMap(tVal) {
 		t[pathKey], err = tVal.(STree).setPathVal(path[1:], val)
