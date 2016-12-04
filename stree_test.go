@@ -129,6 +129,7 @@ func TestSTree(t *testing.T) {
 		sj, err := s.WriteJson(true)
 		So(err, ShouldBeNil)
 		log.Debugf("s json: %s", string(sj))
+		log.Debugf("s: %v", s)
 		sl1, err := s.SliceVal(".a")
 		So(err, ShouldBeNil)
 		So(len(sl1), ShouldEqual, 2)
