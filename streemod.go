@@ -1,6 +1,6 @@
 package gostree
 
-   import (
+import (
 	"bytes"
 	"encoding/gob"
 	"fmt"

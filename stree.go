@@ -17,6 +17,10 @@ type settingsMap map[string]*reflect.Value
 
 type STree map[interface{}]interface{}
 
+func NewSTree() STree {
+	return map[interface{}]interface{}{}
+}
+
 // NewSTreeYaml reads yaml from the specified reader, parses it and returns
 // the structure as an STree.
 func NewSTreeYaml(r io.Reader) (stree STree, err error) {

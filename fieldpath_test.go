@@ -129,6 +129,14 @@ func TestSTreeFieldPaths(t *testing.T) {
 			ValueOfPathMust(`.key1[2].key3[2]`),
 		})
 	})
+
+	Convey("AsPath", t, func() {
+		So(AsPath(), ShouldEqual, "")
+		So(AsPath("key1"), ShouldEqual, ".key1")
+		So(AsPath("key1", "key2"), ShouldEqual, ".key1.key2")
+		So(AsPath("key1[2]", "key2", "key3[1]"), ShouldEqual, ".key1[2].key2.key3[1]")
+		So(AsPath("key.1", "key.2"), ShouldEqual, `.key\.1.key\.2`)
+	})
 }
 
 func verifyPaths(paths, pathsCheck []FieldPath) {
