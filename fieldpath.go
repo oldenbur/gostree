@@ -24,6 +24,14 @@ func (p FieldPath) String() string {
 	}
 }
 
+func PathString(path ...string) string {
+	result := []string{}
+	for _, p := range path {
+		result = append(result, fmt.Sprintf(".%s", p))
+	}
+	return strings.Join(result, "")
+}
+
 func (p FieldPath) shift() FieldPath {
 	if len(p) < 1 {
 		return p
