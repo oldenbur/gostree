@@ -9,11 +9,17 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+
+	log "github.com/cihub/seelog"
 )
 
 type settingsMap map[string]*reflect.Value
 
 type STree map[interface{}]interface{}
+
+func NewSTree() STree {
+	return map[interface{}]interface{}{}
+}
 
 // NewSTreeYaml reads yaml from the specified reader, parses it and returns
 // the structure as an STree.
@@ -39,6 +45,7 @@ func (s STree) WriteYaml() ([]byte, error) {
 func (s STree) WriteJson(indent bool) ([]byte, error) {
 
 	iMap, err := s.unconvertKeys()
+	log.Debugf("iMap: %#v", iMap)
 	if err != nil {
 		return nil, fmt.Errorf("WriteJson error in unconvertKeys: %v", err)
 	}
@@ -386,8 +393,18 @@ func (s STree) unconvertKeys() (map[string]interface{}, error) {
 		val := reflect.ValueOf(v)
 		if isPrimitiveKind(val.Kind()) {
 			result[kStr] = v
-		} else if /*vSlice*/ _, ok := v.([]interface{}); ok {
-			// TODO: handle array items
+		} else if vSlice, ok := v.([]interface{}); ok {
+			result[kStr] = make([]interface{}, len(vSlice))
+			for vIdx, vSub := range vSlice {
+				if sVal, ok := vSub.(STree); ok {
+					cVal, err := sVal.unconvertKeys()
+					if err != nil {
+						return nil, fmt.Errorf("unconvertKeys error converting slice key %s index %d: %v", k, vIdx, err)
+					}
+					result[kStr].([]interface{})[vIdx] = interface{}(cVal)
+				}
+			}
+
 		} else if sVal, ok := v.(STree); ok {
 			cVal, err := sVal.unconvertKeys()
 			if err != nil {

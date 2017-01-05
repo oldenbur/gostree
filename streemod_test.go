@@ -123,19 +123,28 @@ func TestSTreeMod(t *testing.T) {
 		So(err.Error(), ShouldContainSubstring, "unable to traverse below path component")
 	})
 
-	Convey("Test SetVal stree traverse error", t, func() {
-		s, err := NewSTreeJson(strings.NewReader(`{"key3": {"key6": "val6"}}`))
-		So(err, ShouldBeNil)
-		_, err = s.SetVal(".key2", 8)
-		So(err, ShouldNotBeNil)
-		So(err.Error(), ShouldContainSubstring, "path component not found")
-	})
-
 	Convey("Test SetVal invalid path syntax", t, func() {
 		s, err := NewSTreeJson(strings.NewReader(`{"key3": {"key6": "val6"}}`))
 		So(err, ShouldBeNil)
 		_, err = s.SetVal("key3", 8)
 		So(err, ShouldNotBeNil)
 		So(err.Error(), ShouldContainSubstring, "ValueOfPath error")
+	})
+
+	Convey("Test SetVal add single path value", t, func() {
+		var s STree = NewSTree()
+		sm, err := s.SetVal(".key1", "val1")
+		So(err, ShouldBeNil)
+		So(sm.StrValMust(".key1"), ShouldEqual, "val1")
+	})
+
+	Convey("Test SetVal add multiple path value", t, func() {
+		var s STree = NewSTree()
+		sm, err := s.SetVal(".key1.key2[2].key3", 12.34)
+		So(err, ShouldBeNil)
+		So(sm.FloatValMust(".key1.key2[2].key3"), ShouldEqual, 12.34)
+		sm, err = sm.SetVal(".key1.key2[0]", "val2")
+		So(err, ShouldBeNil)
+		So(sm.StrValMust(".key1.key2[0]"), ShouldEqual, "val2")
 	})
 }

@@ -16,7 +16,6 @@ func isPrimitiveKind(k reflect.Kind) bool {
 		isIntKind(k) ||
 		isUintKind(k) ||
 		isFloatKind(k) ||
-		isComplexKind(k) ||
 		isStringKind(k)
 }
 
@@ -62,15 +61,6 @@ func isFloatKind(k reflect.Kind) bool {
 		k == reflect.Float64)
 }
 
-func IsComplex(i interface{}) bool {
-	return isComplexKind(reflect.ValueOf(i).Kind())
-}
-
-func isComplexKind(k reflect.Kind) bool {
-	return (k == reflect.Complex64 ||
-		k == reflect.Complex128)
-}
-
 func IsString(i interface{}) bool {
 	return isStringKind(reflect.ValueOf(i).Kind())
 }
@@ -108,9 +98,7 @@ func printValue(v reflect.Value) string {
 		return fmt.Sprintf("%d", v.Uint())
 	case reflect.Float32, reflect.Float64:
 		return fmt.Sprintf("%f", v.Float())
-	case reflect.Complex64, reflect.Complex128:
-		return fmt.Sprintf("%+v", v.Complex())
 	default:
-		return fmt.Sprintf("<printVal: %v>", v)
+		return fmt.Sprintf("%v", v)
 	}
 }

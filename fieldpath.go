@@ -71,6 +71,10 @@ func ValueOfPathMust(p string) FieldPath {
 	return f
 }
 
+func AsPath(c ...string) string {
+	return FieldPath(c).String()
+}
+
 // FieldPaths returns a slice of FieldPaths representing the list of full key paths to
 // each "leaf" of the STree.
 func (s STree) FieldPaths() (paths []FieldPath) {
