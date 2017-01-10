@@ -4,19 +4,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	yaml "gopkg.in/yaml.v2"
 	"io"
 	"reflect"
 	"regexp"
 	"strconv"
-	"strings"
 
-	yaml "gopkg.in/yaml.v2"
 	log "github.com/cihub/seelog"
 )
 
 type settingsMap map[string]*reflect.Value
 
 type STree map[interface{}]interface{}
+
+func NewSTree() STree {
+	return map[interface{}]interface{}{}
+}
 
 // NewSTreeYaml reads yaml from the specified reader, parses it and returns
 // the structure as an STree.
@@ -35,9 +38,14 @@ func NewSTreeYaml(r io.Reader) (stree STree, err error) {
 	return
 }
 
+func (s STree) WriteYaml() ([]byte, error) {
+	return yaml.Marshal(s)
+}
+
 func (s STree) WriteJson(indent bool) ([]byte, error) {
 
 	iMap, err := s.unconvertKeys()
+	log.Debugf("iMap: %#v", iMap)
 	if err != nil {
 		return nil, fmt.Errorf("WriteJson error in unconvertKeys: %v", err)
 	}
@@ -87,7 +95,7 @@ func findStructElemsPath(pre string, s interface{}, valsIn settingsMap) (vals se
 
 		f := r.Field(i)
 
-		if isPrimitive(f.Kind()) {
+		if isPrimitiveKind(f.Kind()) {
 			vals[rType.Field(i).Name] = &f
 		}
 	}
@@ -95,244 +103,224 @@ func findStructElemsPath(pre string, s interface{}, valsIn settingsMap) (vals se
 	return vals, nil
 }
 
-// isPrimitive returns true if the specified Kind represents a primitive
-// type, false otherwise.
-func isPrimitive(k reflect.Kind) bool {
-	return (k == reflect.Bool ||
-		k == reflect.Int ||
-		k == reflect.Int8 ||
-		k == reflect.Int16 ||
-		k == reflect.Int32 ||
-		k == reflect.Int64 ||
-		k == reflect.Uint ||
-		k == reflect.Uint8 ||
-		k == reflect.Uint16 ||
-		k == reflect.Uint32 ||
-		k == reflect.Uint64 ||
-		k == reflect.Uintptr ||
-		k == reflect.Float32 ||
-		k == reflect.Float64 ||
-		k == reflect.Complex64 ||
-		k == reflect.Complex128 ||
-		k == reflect.String)
+// Size returns the number of leaf entries in the STree
+// TODO: cache keys?
+func (t STree) Size() int {
+	return len(t.Keys())
 }
 
-func printVal(v reflect.Value) string {
-
-	switch v.Kind() {
-	case reflect.Bool:
-		return fmt.Sprintf("%t", v.Bool())
-	case reflect.String:
-		return v.String()
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return fmt.Sprintf("%d", v.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return fmt.Sprintf("%d", v.Uint())
-	case reflect.Float32, reflect.Float64:
-		return fmt.Sprintf("%f", v.Float())
-	case reflect.Complex64, reflect.Complex128:
-		return fmt.Sprintf("%+v", v.Complex())
-	default:
-		return fmt.Sprintf("<printVal: %v>", v)
+// Keys returns a slice containing all top-level keys of this STree
+func (t STree) Keys() []interface{} {
+	keys := []interface{}{}
+	for k, _ := range t {
+		keys = append(keys, k)
 	}
+	return keys
+}
+
+// KeyStrings returns a slice containing all top-level keys of this STree converted to
+// string, or an error if the conversion fails for any key
+func (t STree) KeyStrings() ([]string, error) {
+	keys := []string{}
+	for k, _ := range t {
+		if s, ok := k.(string); !ok {
+			return keys, fmt.Errorf("KeyStrings failed to convert %v to string type", k)
+		} else {
+			keys = append(keys, s)
+		}
+	}
+	return keys, nil
 }
 
 // keyRegexp matches strings of the form key_name or slice_name[123]
-var keyRegexp *regexp.Regexp = regexp.MustCompile(`^(\w+)(?:\[(\d+)\])?$`)
+var keyRegexp *regexp.Regexp = regexp.MustCompile(`^([^\[\]]+)(?:\[(\d+)\])?$`)
 
-// Val returns the leaf value at the position specified by path,
-// which is a slash delimited list of nested keys in data, e.g.
-// level1/level2/key
-func (t STree) Val(path string) interface{} {
+// Val returns the leaf value at the position specified by path, which is a slash delimited
+// list of nested keys in data, e.g. .level1.level2.key. If the key does not exist, an error
+// is returned.
+func (t STree) Val(path string) (interface{}, error) {
 
-	keys := strings.Split(path, "/")
-//	log.Debugf("Val(%s) - %T", path, t)
-
-	key_comps := keyRegexp.FindStringSubmatch(keys[0])
-	if key_comps == nil || len(key_comps) < 1 {
-		log.Warnf("val failed to parse key %s", keys[0])
-		return nil
+	keys, err := ValueOfPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse path: %s", path)
 	}
+	keyCur := keys.next()
 
-	key := key_comps[1]
-	idx := -1
-	if len(key_comps[2]) > 0 {
-		i, err := strconv.Atoi(key_comps[2])
-		if err != nil || i < 0 {
-			log.Warnf("val failed to parse slice index %s", key_comps[1])
-			return nil
-		}
-		idx = i
-	}
+	key, idx, err := t.parsePathComponent(keyCur)
 
 	if len(keys) < 1 {
-		return nil
+		return nil, fmt.Errorf("no key remaining components")
 
 	} else if len(keys) == 1 && idx < 0 {
-//		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
-		return t[key]
+		//		log.Debugf("Val(%s) - LastKey: %v", path, t[key])
+		if val, ok := t[key]; !ok {
+			return nil, fmt.Errorf("Val item not found at key %s", keyCur)
+		} else {
+			return val, nil
+		}
 
 	} else if data, ok := t[key].(STree); ok {
 		if idx >= 0 {
-			log.Warnf("Val unexpected index for STree value: %s", keys[0])
-			return nil
+			return nil, fmt.Errorf("Val unexpected index for STree value: %s", keyCur)
+		} else {
+			return data.Val(keys.shift().String())
 		}
-		return data.Val(strings.Join(keys[1:], "/"))
 
 	} else if data, ok := t[key].([]interface{}); ok {
 		// TODO: break this case out to recursively handle nested slices
-//		log.Debugf("Val(%s) - slice: %v", path, data)
+		//		log.Debugf("Val(%s) - slice: %v", path, data)
 		if idx >= 0 && idx < len(data) {
 			result := data[idx]
-			if len(keys) < 2 {
-				return result
+			if len(keys) <= 1 {
+				return result, nil
 			} else if sval, ok := result.(STree); ok {
-				return sval.Val(strings.Join(keys[1:], "/"))
+				return sval.Val(keys.shift().String())
 			}
 
 		} else if idx < 0 {
 			if len(keys) > 1 {
-				log.Warnf("Val requires index to traverse slice value for key: %s", keys[0])
-				return nil
+				return nil, fmt.Errorf("Val requires index to traverse slice value for key: %s", keyCur)
 			}
-			return data
+			return data, nil
 
 		} else {
-			log.Warnf("Val invalid slice key index: %s", keys[0])
-			return nil
+			return nil, fmt.Errorf("Val slice key index out of range [0,%d]: %s", len(data)-1, keyCur)
 		}
 	}
 
-	log.Warnf("Val failed to produce value for key: %s", keys[0])
-	return nil
+	return nil, fmt.Errorf("Val failed to produce value for key: %s", keyCur)
+}
+
+func (t STree) ValMust(path string) (interface{}, error) {
+	val, err := t.Val(path)
+	if err != nil {
+		panic(err)
+	}
+	return val, nil
 }
 
 // SVal returns the value stored in data at the path, converting it
 // to a a string, and returning the zero value if the string is not
 // found.
-func (t STree) StrVal(path string) (s string) {
-	v := t.Val(path)
+func (t STree) StrVal(path string) (string, error) {
+	v, err := t.Val(path)
 	if sval, ok := v.(string); ok {
-		s = sval
+		return sval, err
 	}
-	return
+	return "", fmt.Errorf("StrVal found unexpected value type %T for path '%s'", v, path)
 }
 
-// IVal returns the value stored in data at the path, converting it
-// to an int64, and returning the zero value if the int is not found.
-func (t STree) IntVal(path string) (i int64) {
-	v := t.Val(path)
-	if ival, ok := v.(int64); ok {
-		i64 := int64(ival)
-		i = i64
-	} else if ival, ok := v.(float64); ok {
-		i64 := int64(ival)
-		i = i64
+func (t STree) StrValMust(path string) string {
+	v, err := t.StrVal(path)
+	if err != nil {
+		panic(err)
 	}
-	return
+	return v
+}
+
+// IntVal returns the value stored in data at the path, converting it
+// to an int64, and returning the zero value if the int is not found.
+func (t STree) IntVal(path string) (int64, error) {
+	v, err := t.Val(path)
+	if ival, ok := v.(int64); ok {
+		return int64(ival), err
+	} else if ival, ok := v.(int); ok {
+		return int64(ival), err
+	} else if ival, ok := v.(float64); ok {
+		return int64(ival), err
+	}
+	return 0, fmt.Errorf("IntVal found unexpected value type %T for path '%s'", v, path)
+}
+
+func (t STree) IntValMust(path string) int64 {
+	v, err := t.IntVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// FloatVal returns the value stored in data at the path, converting it
+// to an int64, and returning the zero value if the value cannot be converted.
+func (t STree) FloatVal(path string) (float64, error) {
+	v, err := t.Val(path)
+	if fval, ok := v.(float64); ok {
+		return fval, err
+	}
+	return 0, fmt.Errorf("FloatVal found unexpected value type %T for path '%s'", v, path)
+}
+
+func (t STree) FloatValMust(path string) float64 {
+	v, err := t.FloatVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
 }
 
 // BVal returns the value stored in data at the path, converting it
 // to an bool, and returning the zero value if the bool is not found.
-func (t STree) BoolVal(path string) (b bool) {
-	v := t.Val(path)
+func (t STree) BoolVal(path string) (bool, error) {
+	v, err := t.Val(path)
 	if bval, ok := v.(bool); ok {
-		b = bval
+		return bval, err
 	}
-	return
+	return false, fmt.Errorf("BoolVal found unexpected value type %T for path '%s'", v, path)
 }
 
-// TVal returns the value stored in data at the path, converting it
+func (t STree) BoolValMust(path string) bool {
+	v, err := t.BoolVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// STreeVal returns the value stored in data at the path, converting it
 // to an STree and returning nil if the operation fails.
-func (t STree) STreeVal(path string) (s STree) {
-	v := t.Val(path)
+func (t STree) STreeVal(path string) (STree, error) {
+	v, err := t.Val(path)
 	if sval, ok := v.(STree); ok {
-		s = sval
+		return sval, err
 	}
-	return
+	return nil, fmt.Errorf("STreeVal found unexpected value type %T for path '%s'", v, path)
 }
 
+func (t STree) STreeValMust(path string) STree {
+	v, err := t.STreeVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
 
-func (t STree) SliceVal(path string) (a []interface{}) {
-	v := t.Val(path)
+// SliceVal returns the value stored in the STree at the path, converting
+// it to a []interface{} and returning nil if the operation fails.
+func (t STree) SliceVal(path string) ([]interface{}, error) {
+	v, err := t.Val(path)
 	if aval, ok := v.([]interface{}); ok {
-		a = aval
+		return aval, err
 	}
-	return
+	return nil, fmt.Errorf("SliceVal found unexpected value type %T for path '%s'", v, path)
 }
 
+func (t STree) SliceValMust(path string) []interface{} {
+	v, err := t.SliceVal(path)
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
+
+// ValueOf assumes that the specified value is convertable to map[interface{}]interface{}
+// and otherwise upholds the invariants of an STree structure. It's value as an STree
+// is returned.
 func ValueOf(v interface{}) (STree, error) {
 	if sval, ok := v.(STree); ok {
 		return sval, nil
 	} else {
 		return nil, fmt.Errorf("ValueOf failed to convert input (type %T)", v)
 	}
-}
-
-// MarhsalJSON returns a JSON-rendered representation of the subject STree.
-func (t STree) MarshalJSON() ([]byte, error) {
-
-	buf := []byte{'{'}
-	i := 0
-
-	for k, v := range t {
-
-		if i > 0 {
-			buf = append(buf, ',')
-		}
-		buf = append(buf, []byte(fmt.Sprintf(`"%v":`, k))...)
-
-		vMarsh, err := marshalJSONVal(v)
-		if err != nil {
-			return nil, err
-		}
-		buf = append(buf, vMarsh...)
-
-		i += 1
-	}
-	buf = append(buf, '}')
-
-	return buf, nil
-}
-
-// marshalJSONVal examines the structure of the specified value and returns
-// a JSON-rendered representation of it.
-func marshalJSONVal(v interface{}) ([]byte, error) {
-
-	val := reflect.ValueOf(v)
-	if val.Kind() == reflect.String {
-		sVal := strings.Replace(val.String(), `\`, `\\`, -1)
-		return []byte(fmt.Sprintf(`"%s"`, sVal)), nil
-
-	} else if isPrimitive(val.Kind()) {
-		return []byte(fmt.Sprintf(`%s`, printVal(val))), nil
-
-	} else if vSlice, ok := v.([]interface{}); ok {
-		buf := []byte{}
-		buf = append(buf, '[')
-
-		for i, sv := range vSlice {
-			m, err := marshalJSONVal(sv)
-			if err != nil {
-				return nil, err
-			}
-			if i > 0 {
-				buf = append(buf, ',')
-			}
-			buf = append(buf, m...)
-		}
-		buf = append(buf, ']')
-		return buf, nil
-
-	} else if vSTree, ok := v.(STree); ok {
-		buf, err := vSTree.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
-		return buf, nil
-	}
-
-	return nil, fmt.Errorf("marshalJSONVal unhandled value type for %v", v)
 }
 
 // convertKeys returns the input map re-typed with all keys as interface{}
@@ -359,7 +347,7 @@ func convertVal(v interface{}) (interface{}, error) {
 	var result interface{}
 
 	val := reflect.ValueOf(v)
-	if isPrimitive(val.Kind()) {
+	if isPrimitiveKind(val.Kind()) {
 		result = v
 
 	} else if vSlice, ok := v.([]interface{}); ok {
@@ -387,7 +375,6 @@ func convertVal(v interface{}) (interface{}, error) {
 	return result, nil
 }
 
-
 // unconvertKeys returns a nested map with the same structure as the STree,
 // but with string-typed keys, for use in json.Marshall() and the like.
 func (s STree) unconvertKeys() (map[string]interface{}, error) {
@@ -404,10 +391,20 @@ func (s STree) unconvertKeys() (map[string]interface{}, error) {
 		}
 
 		val := reflect.ValueOf(v)
-		if isPrimitive(val.Kind()) {
+		if isPrimitiveKind(val.Kind()) {
 			result[kStr] = v
-		} else if /*vSlice*/ _, ok := v.([]interface{}); ok {
-			// leave array items out for now
+		} else if vSlice, ok := v.([]interface{}); ok {
+			result[kStr] = make([]interface{}, len(vSlice))
+			for vIdx, vSub := range vSlice {
+				if sVal, ok := vSub.(STree); ok {
+					cVal, err := sVal.unconvertKeys()
+					if err != nil {
+						return nil, fmt.Errorf("unconvertKeys error converting slice key %s index %d: %v", k, vIdx, err)
+					}
+					result[kStr].([]interface{})[vIdx] = interface{}(cVal)
+				}
+			}
+
 		} else if sVal, ok := v.(STree); ok {
 			cVal, err := sVal.unconvertKeys()
 			if err != nil {
@@ -422,4 +419,25 @@ func (s STree) unconvertKeys() (map[string]interface{}, error) {
 	return result, nil
 }
 
+// parsePathComponent parses the input as a stree key with an optional subscript
+// index, e.g. "streeKey" or "treeList[2]". The key component and subscript index
+// is returned, with -1 denoting no subscript present.
+func (s STree) parsePathComponent(c string) (string, int, error) {
 
+	path_comps := keyRegexp.FindStringSubmatch(c)
+	if path_comps == nil || len(path_comps) < 1 {
+		return "", -1, fmt.Errorf("parsePathComponent failed to parse path component %s", c)
+	}
+
+	path := path_comps[1]
+	idx := -1
+	if len(path_comps[2]) > 0 {
+		i, err := strconv.Atoi(path_comps[2])
+		if err != nil || i < 0 {
+			return "", -1, fmt.Errorf("parsePathComponent failed to parse slice index %s from %s", path_comps[2], c)
+		}
+		idx = i
+	}
+
+	return path, idx, nil
+}

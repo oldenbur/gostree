@@ -4,11 +4,15 @@ import (
 	"strings"
 	"testing"
 
+	"fmt"
 	log "github.com/cihub/seelog"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func init() {
+func init() { configureTestLogger() }
+
+// ConfigureTestLogger configures the global logger to print to console only
+func configureTestLogger() {
 
 	testConfig := `
         <seelog type="sync" minlevel="debug">
@@ -67,18 +71,54 @@ func TestSTree(t *testing.T) {
 
 	Convey("Json tree access", t, func() {
 
+		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key.2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
+		So(err, ShouldBeNil)
+		v1, err := s.StrVal(".key1")
+		So(err, ShouldBeNil)
+		So(v1, ShouldEqual, "val1")
+		v2, err := s.IntVal(`.key\.2`)
+		So(err, ShouldBeNil)
+		So(v2, ShouldEqual, 1234)
+		ss, err := s.STreeVal(".key3")
+		So(err, ShouldBeNil)
+		So(len(ss), ShouldEqual, 2)
+		v4, err := s.BoolVal(".key3.key4")
+		So(err, ShouldBeNil)
+		So(v4, ShouldEqual, true)
+		v5, err := s.FloatVal(".key3.key5")
+		So(err, ShouldBeNil)
+		So(v5, ShouldEqual, -12.34)
+
+		_, err = s.WriteJson(true)
+		So(err, ShouldBeNil)
+		//		log.Debugf("json: %s", string(json))
+	})
+
+	Convey("Json Keys", t, func() {
+
 		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
 		So(err, ShouldBeNil)
-		So(s.StrVal("key1"), ShouldEqual, "val1")
-		So(s.IntVal("key2"), ShouldEqual, 1234)
-		ss := s.STreeVal("key3")
-		So(len(ss), ShouldEqual, 2)
-		So(s.BoolVal("key3/key4"), ShouldEqual, true)
-		So(s.IntVal("key3/key5"), ShouldEqual, -12)
 
-		json, err := s.WriteJson(true)
+		keys := s.Keys()
+		So(len(keys), ShouldEqual, 3)
+		So(keys, ShouldContain, "key1")
+		So(keys, ShouldContain, "key2")
+		So(keys, ShouldContain, "key3")
+		//		log.Debugf("Json keys: %v", keys)
+	})
+
+	Convey("Json KeyStrings", t, func() {
+
+		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
 		So(err, ShouldBeNil)
-		log.Debugf("json: %s", string(json))
+
+		keys, err := s.KeyStrings()
+		So(err, ShouldBeNil)
+		So(len(keys), ShouldEqual, 3)
+		So(keys, ShouldContain, "key1")
+		So(keys, ShouldContain, "key2")
+		So(keys, ShouldContain, "key3")
+		//		log.Debugf("Json key strings: %v", keys)
 	})
 
 	Convey("Json array structure\n", t, func() {
@@ -87,17 +127,114 @@ func TestSTree(t *testing.T) {
 		s, err := NewSTreeJson(strings.NewReader(data))
 		So(err, ShouldBeNil)
 		log.Debugf("s: %v", s)
-		sj, err := s.MarshalJSON()
+		sj, err := s.WriteJson(true)
 		So(err, ShouldBeNil)
 		log.Debugf("s json: %s", string(sj))
-		sl1 := s.SliceVal("a")
+		log.Debugf("s: %v", s)
+		sl1, err := s.SliceVal(".a")
+		So(err, ShouldBeNil)
 		So(len(sl1), ShouldEqual, 2)
-		So(s.StrVal("a[0]/d"), ShouldEqual, "DDD")
-		So(s.IntVal("a[1]"), ShouldEqual, 19)
-		st1 := s.STreeVal("a[0]")
-		So(st1.IntVal("b"), ShouldEqual, 1)
-		st1j, err := st1.MarshalJSON()
+		vd, err := s.StrVal(".a[0].d")
+		So(err, ShouldBeNil)
+		So(vd, ShouldEqual, "DDD")
+		a1v, err := s.IntVal(".a[1]")
+		So(err, ShouldBeNil)
+		So(a1v, ShouldEqual, 19)
+		st1, err := s.STreeVal(".a[0]")
+		So(err, ShouldBeNil)
+		st1v, err := st1.IntVal(".b")
+		So(err, ShouldBeNil)
+		So(st1v, ShouldEqual, 1)
+		st1j, err := st1.WriteJson(true)
 		So(err, ShouldBeNil)
 		log.Debugf("st1j: %s", string(st1j))
 	})
+
+	var yamlData string = `
+---
+product:
+- sku         : BL394D
+  quantity    : 4
+  description : Basketball
+  price       : 450.00
+- sku         : BL4438H
+  quantity    : 1
+  description : Super Hoop
+  price       : 2392.00
+tax  : 251.42
+total: 4443.52
+comments: >
+  Late afternoon is best.
+  Backup contact is Nancy
+  Billsmer @ 338-4338.
+`
+
+	Convey("NewSTreeYaml\n", t, func() {
+
+		s, err := NewSTreeYaml(strings.NewReader(yamlData))
+		So(err, ShouldBeNil)
+		log.Debugf("s: %v", s)
+
+		_, err = s.WriteYaml()
+		So(err, ShouldBeNil)
+	})
+
+	Convey("b-tree in yaml\n", t, func() {
+
+		yaml := `
+---
+L1:
+  L2.1:
+    L3.1.1:
+    L3.1.2:
+  L2.2:
+    L3.2.1:
+`
+
+		s, err := NewSTreeYaml(strings.NewReader(yaml))
+		So(err, ShouldBeNil)
+		log.Debugf("s: %v", s)
+
+		keys, _ := s.KeyStrings()
+		n := newNode(keys[0], s.STreeValMust(AsPath(keys[0])))
+		log.Debugf("n:\n%v", n)
+	})
+}
+
+type node struct {
+	data string
+	l, r *node
+}
+
+func newNode(data string, t interface{}) *node {
+	log.Debugf("newNode(%s, %v)", data, t)
+	n := &node{data: data}
+	if t == nil {
+		return n
+	}
+	keys, _ := t.(STree).KeyStrings()
+	if len(keys) > 0 {
+		lChild, _ := t.(STree).STreeVal(AsPath(keys[0]))
+		n.l = newNode(keys[0], lChild)
+	}
+	if len(keys) > 1 {
+		rChild, _ := t.(STree).STreeVal(AsPath(keys[1]))
+		n.r = newNode(keys[1], rChild)
+	}
+	return n
+}
+
+func (n *node) String() string {
+	return n.string("")
+}
+
+func (n *node) string(i string) string {
+	s := fmt.Sprintf("%s%s\n", i, n.data)
+	if n.l != nil {
+		s += n.l.string(i + "  ")
+	}
+	if n.r != nil {
+		s += n.r.string(i + "  ")
+	}
+	return s
 }

@@ -1,0 +1,8 @@
+# travis-ci build file
+language: go
+
+go:
+  - 1.7.3
+
+script:
+  - go test ./...
