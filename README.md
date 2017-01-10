@@ -114,3 +114,8 @@ map[string]FieldComparisonResult {
 }
 */
 ```
+
+### Known Issues
+
+* Nested lists are not supported, e.g. .listVal[1][2]
+

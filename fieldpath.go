@@ -24,6 +24,14 @@ func (p FieldPath) String() string {
 	}
 }
 
+func PathString(path ...string) string {
+	result := []string{}
+	for _, p := range path {
+		result = append(result, fmt.Sprintf(".%s", p))
+	}
+	return strings.Join(result, "")
+}
+
 func (p FieldPath) shift() FieldPath {
 	if len(p) < 1 {
 		return p
@@ -61,6 +69,10 @@ func ValueOfPathMust(p string) FieldPath {
 		panic(err)
 	}
 	return f
+}
+
+func AsPath(c ...string) string {
+	return FieldPath(c).String()
 }
 
 // FieldPaths returns a slice of FieldPaths representing the list of full key paths to

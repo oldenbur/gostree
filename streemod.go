@@ -60,17 +60,20 @@ func (t STree) setPathVal(path FieldPath, val interface{}) (STree, error) {
 
 	var tVal interface{}
 	if tv, ok := t[pathKey]; !ok {
-		return t, fmt.Errorf("setPathVal path component not found: %s", path[0])
+		//return t, fmt.Errorf("setPathVal path component not found: %s", path[0])
+
+		return t.addPathVal(path, val)
+
 	} else {
 		tVal = tv
 	}
+
+	log.Tracef("setPathVal(%v) on %v", path[1:], tVal)
 
 	if len(path) == 1 && pathIdx < 0 {
 		t[pathKey] = val
 		return t, nil
 	}
-
-	log.Tracef("setPathVal(%v) on %v", path[1:], tVal)
 
 	if IsMap(tVal) {
 		t[pathKey], err = tVal.(STree).setPathVal(path[1:], val)
@@ -95,4 +98,36 @@ func (t STree) setPathVal(path FieldPath, val interface{}) (STree, error) {
 		return t, fmt.Errorf("setPathVal unable to traverse below path component: %s", path[0])
 	}
 
+}
+
+func (t STree) addPathVal(path FieldPath, val interface{}) (STree, error) {
+
+	if path == nil || len(path) < 1 {
+		return t, fmt.Errorf("addPathVal called with no path")
+	}
+
+	pathKey, pathIdx, err := t.parsePathComponent(path[0])
+	if err != nil {
+		return t, fmt.Errorf("addPathVal parsePathComponent error: %v", err)
+	}
+
+	if len(path) == 1 {
+		if pathIdx < 0 {
+			t[pathKey] = val
+		} else {
+			t[pathKey] = make([]interface{}, pathIdx+1)
+			t[pathKey].([]interface{})[pathIdx] = val
+		}
+		return t, nil
+	} else {
+		var tSub STree = map[interface{}]interface{}{}
+		if pathIdx < 0 {
+			t[pathKey] = tSub
+		} else {
+			t[pathKey] = make([]interface{}, pathIdx+1)
+			t[pathKey].([]interface{})[pathIdx] = tSub
+		}
+		_, err = tSub.addPathVal(path[1:], val)
+		return t, err
+	}
 }
