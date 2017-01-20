@@ -47,7 +47,7 @@ func (p FieldPath) append(keys ...string) FieldPath {
 	return p
 }
 
-func (p FieldPath) next() string {
+func (p FieldPath) first() string {
 	if len(p) < 1 {
 		return ""
 	} else {
@@ -55,12 +55,23 @@ func (p FieldPath) next() string {
 	}
 }
 
+func (p FieldPath) last() string {
+	if len(p) < 1 {
+		return ""
+	} else {
+		return p[len(p)-1]
+	}
+}
+
 func ValueOfPath(p string) (FieldPath, error) {
+	var result []string
+	if len(p) < 1 {
+		return result, nil
+	}
 	if !strings.HasPrefix(p, ".") {
 		return nil, fmt.Errorf("ValueOfPath lacks prefix .: %s", p)
 	}
 	subs := pathRegexp.FindAllStringSubmatch(p, -1)
-	var result []string
 	for i, sub := range subs {
 		if len(sub) < 2 {
 			return result, fmt.Errorf("ValueOfPath(\"%s\") unexpected submatch %d: %q", p, i, subs)

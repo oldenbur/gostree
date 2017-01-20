@@ -79,6 +79,68 @@ v4 := s.STreeValMust(`.key3.key6.key7[2]`)      // v4 is STree {"key8": "val8"}
 v5 := s.StrValMust(`.key3.key6.key7[2].key8`)   // v5 is string "val8"
 ```
 
+### Traverse an STree with a Visitor
+
+Clients can definite a visitor to easily traverse an STree, handling primitive, nested object and slice differently.
+```go
+
+json := `
+{
+  "key1": "val1",
+  "key2": 1234,
+  "key3": {
+    "key4": true,
+    "key5": -12.34,
+    "key6": {
+      "key7": [1, 2, 3]
+    }
+  }
+}`
+s, _ := NewSTreeJson(strings.NewReader(json))
+
+s.Visit(NewVisitorBuilder().
+  WithPrimitiveVisitor(func(key string, val interface{}) error {
+    fmt.Printf("primitive - %s: %v", key, val)
+    return nil
+  }).
+  WithSTreeBeginVisitor(func(key string, val STree) error {
+    fmt.Printf("object beginning - %s", key)
+    return nil
+  }).
+  WithSTreeEndVisitor(func(key string, val STree) error {
+    fmt.Printf("object ending - %s", key)
+    return nil
+  }).
+  WithSliceBeginVisitor(func(key string, val []interface{}) error {
+    fmt.Printf("slice beginning - %s len: %d", key, len(val))
+    return nil
+  }).
+  WithSliceEndVisitor(func(key string, val []interface{}) error {
+    fmt.Printf("slice ending - %s len: %d"", key, len(val))
+    return nil
+  }).
+  Visitor(),
+)
+
+/*
+prints:
+
+primitive - .key1: val1
+primitive - .key2: 1234
+object beginning - .key3
+primitive - .key3.key4: true
+primitive - .key3.key5: -12.340000
+object beginning - .key3.key6
+slice beginning - .key3.key6.key7 len: 3
+primitive - .key3.key6.key7[0]: 1
+primitive - .key3.key6.key7[1]: 2
+primitive - .key3.key6.key7[2]: 3
+slice ending - .key3.key6.key7 len: 3
+object ending - .key3.key6
+object ending - .key3
+*/
+```
+
 ### Comparing STrees
 
 Two STrees can be compared to one another. The values, value types and the structure of each STree is taken into account:
@@ -102,6 +164,7 @@ key4: val4
 s1, _ := NewSTreeJson(strings.NewReader(json))
 s2, _ := NewSTreeYaml(strings.NewReader(yaml))
 diff, _ := s1.CompareTo(s2)
+
 /*
 diff is:
 map[string]FieldComparisonResult {
