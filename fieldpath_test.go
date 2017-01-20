@@ -14,6 +14,7 @@ func init() { configureTestLogger() }
 func TestSTreeFieldPaths(t *testing.T) {
 
 	Convey("String", t, func() {
+		So(ValueOfPathMust(``).String(), ShouldEqual, ``)
 		So(ValueOfPathMust(`.key1`).String(), ShouldEqual, `.key1`)
 		So(ValueOfPathMust(`.key\.1`).String(), ShouldEqual, `.key\.1`)
 		So(ValueOfPathMust(`.key1.key2.key3`).String(), ShouldEqual, `.key1.key2.key3`)

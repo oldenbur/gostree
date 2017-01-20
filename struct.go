@@ -4,116 +4,91 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"unicode"
 )
 
-func (s STree) GoStruct(name string) (io.Reader, error) {
+var indexRegexp *regexp.Regexp = regexp.MustCompile(`\[\d+\]$`)
 
-	buf := &bytes.Buffer{}
+func (s STree) GoStruct(structName string) (io.Reader, error) {
 
-	buf.WriteString(fmt.Sprintf("type %s struct {\n", name))
-	buf, err := s.goStruct("  ", buf)
-	buf.WriteString("}")
+	var err error
+	var buf *bytes.Buffer = &bytes.Buffer{}
+
+	err = s.Visit(NewVisitorBuilder().
+		WithPrimitiveVisitor(func(key string, val interface{}) error {
+
+			var name string = ValueOfPathMust(key).last()
+
+			var skip bool
+			var typePre string
+			if skip, name, typePre = s.sliceSetup(key, name); skip {
+				return nil
+			}
+
+			valType := fmt.Sprintf("%T", val)
+			buf.WriteString(fmt.Sprintf("%s%s %s%s `yaml:\"%s\"`\n", indent(key), capitalize(name), typePre, valType, name))
+			return nil
+		}).
+		WithSTreeBeginVisitor(func(key string, val STree) error {
+
+			var skip bool
+			var typePre string
+			var name string = structName
+			if len(key) > 0 {
+				name = ValueOfPathMust(key).last()
+				if skip, name, typePre = s.sliceSetup(key, name); skip {
+					return nil
+				}
+				buf.WriteString(fmt.Sprintf("%s%s %sstruct {\n", indent(key), capitalize(name), typePre))
+			} else {
+				buf.WriteString(fmt.Sprintf("type %s struct {\n", capitalize(name)))
+			}
+			return nil
+		}).
+		WithSTreeEndVisitor(func(key string, val STree) error {
+
+			var skip bool
+			var name string = structName
+			if len(key) > 0 {
+				name = ValueOfPathMust(key).last()
+				if skip, name, _ = s.sliceSetup(key, name); skip {
+					return nil
+				}
+				buf.WriteString(fmt.Sprintf("%s} `yaml:\"%s\"`\n", indent(key), name))
+			} else {
+				buf.WriteString(fmt.Sprintf("}\n"))
+			}
+			return nil
+		}).
+		Visitor(),
+	)
 
 	return buf, err
 }
 
-func (s STree) goStruct(indent string, buf *bytes.Buffer) (*bytes.Buffer, error) {
+func (s STree) sliceSetup(key, name string) (bool, string, string) {
 
-	keys, err := s.KeyStrings()
-	if err != nil {
-		return buf, fmt.Errorf("GoStruct KeyStrings error: %v", err)
+	typePre := ""
+	if indexRegexp.MatchString(name) {
+		typePre = "[]"
 	}
 
-	for _, key := range keys {
-
-		val, err := s.Val(PathString(key))
-		if err != nil {
-			return buf, fmt.Errorf("GoStruct Val(%s) error: %v")
-		}
-
-		if buf, err = s.printVal(buf, indent, key, "", val); err != nil {
-			return buf, err
-		}
-
-		buf.WriteString("")
-	}
-
-	return buf, nil
+	return !s.isFirst(key), indexRegexp.ReplaceAllString(name, ""), typePre
 }
 
-func (s STree) printVal(buf *bytes.Buffer, indent, key, typePre string, val interface{}) (*bytes.Buffer, error) {
-
-	var err error
-
-	if IsPrimitive(val) {
-
-		buf = s.printStructPrimitive(buf, indent, key, typePre, val)
-
-	} else if IsMap(val) {
-
-		if buf, err = s.printStructSTree(buf, indent, key, typePre, val); err != nil {
-			return buf, err
-		}
-
-	} else if IsSlice(val) {
-
-		if buf, err = s.printStructSlice(buf, indent, key, typePre, val); err != nil {
-			return buf, err
-		}
-
-	}
-
-	return buf, nil
-}
-
-func (s STree) printStructPrimitive(buf *bytes.Buffer, indent, key, typePre string, val interface{}) *bytes.Buffer {
-
-	valType := fmt.Sprintf("%T", val)
-	buf.WriteString(fmt.Sprintf("%s%s %s%s `yaml:\"%s\"`\n", indent, capitalize(key), typePre, valType, key))
-	return buf
-}
-
-func (s STree) printStructSTree(buf *bytes.Buffer, indent, key, typePre string, val interface{}) (*bytes.Buffer, error) {
-
-	var err error
-	buf.WriteString(fmt.Sprintf("%s%s %sstruct {\n", indent, capitalize(key), typePre))
-	if sval, ok := val.(STree); !ok {
-		return buf, fmt.Errorf("goStruct failed to convert val to STree: %v", val)
+func (s STree) isFirst(key string) bool {
+	p := ValueOfPathMust(key)
+	if len(p) < 1 {
+		return true
+	} else if _, idx, err := s.parsePathComponent(p[0]); err != nil {
+		return true
+	} else if idx == 0 || (idx < 0 && len(p) > 1) {
+		return s.isFirst(p.shift().String())
 	} else {
-		buf, err = sval.goStruct(fmt.Sprintf("%s  ", indent), buf)
-		if err != nil {
-			return buf, err
-		}
+		return (idx < 0)
 	}
-	buf.WriteString(fmt.Sprintf("%s} `yaml:\"%s\"`\n", indent, key))
-	return buf, nil
-}
-
-func (s STree) printStructSlice(buf *bytes.Buffer, indent, key, typePre string, val interface{}) (*bytes.Buffer, error) {
-
-	var err error
-
-	if aval, ok := val.([]interface{}); !ok {
-
-		return buf, fmt.Errorf("goStruct failed to convert val to STree: %v", val)
-
-	} else if len(aval) > 0 {
-
-		var abuf *bytes.Buffer = &bytes.Buffer{}
-		for i, v := range aval {
-			abuf = &bytes.Buffer{}
-			if abuf, err = s.printVal(abuf, indent, key, "[]", v); err != nil {
-				return buf, fmt.Errorf("printVal error on slice key: %s  index: %d  error: %v", key, i, err)
-			}
-		}
-
-		buf.WriteString(abuf.String())
-
-	}
-
-	return buf, nil
 }
 
 func capitalize(s string) string {
@@ -127,4 +102,14 @@ func capitalize(s string) string {
 			return r
 		}
 	}, s)
+}
+
+const singleIndent string = "  "
+
+func indent(key string) string {
+	result := ""
+	for range ValueOfPathMust(key) {
+		result = result + singleIndent
+	}
+	return result
 }

@@ -40,7 +40,14 @@ func (p FieldPath) shift() FieldPath {
 	}
 }
 
-func (p FieldPath) next() string {
+func (p FieldPath) append(keys ...string) FieldPath {
+	for _, key := range keys {
+		p = append(p, key)
+	}
+	return p
+}
+
+func (p FieldPath) first() string {
 	if len(p) < 1 {
 		return ""
 	} else {
@@ -48,12 +55,23 @@ func (p FieldPath) next() string {
 	}
 }
 
+func (p FieldPath) last() string {
+	if len(p) < 1 {
+		return ""
+	} else {
+		return p[len(p)-1]
+	}
+}
+
 func ValueOfPath(p string) (FieldPath, error) {
+	var result []string
+	if len(p) < 1 {
+		return result, nil
+	}
 	if !strings.HasPrefix(p, ".") {
 		return nil, fmt.Errorf("ValueOfPath lacks prefix .: %s", p)
 	}
 	subs := pathRegexp.FindAllStringSubmatch(p, -1)
-	var result []string
 	for i, sub := range subs {
 		if len(sub) < 2 {
 			return result, fmt.Errorf("ValueOfPath(\"%s\") unexpected submatch %d: %q", p, i, subs)
@@ -71,8 +89,8 @@ func ValueOfPathMust(p string) FieldPath {
 	return f
 }
 
-func AsPath(c ...string) string {
-	return FieldPath(c).String()
+func AsPath(keys ...string) string {
+	return FieldPath(keys).String()
 }
 
 // FieldPaths returns a slice of FieldPaths representing the list of full key paths to

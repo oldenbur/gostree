@@ -144,7 +144,7 @@ func (t STree) Val(path string) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse path: %s", path)
 	}
-	keyCur := keys.next()
+	keyCur := keys.first()
 
 	key, idx, err := t.parsePathComponent(keyCur)
 
