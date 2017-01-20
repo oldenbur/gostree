@@ -27,7 +27,7 @@ func (p FieldPath) String() string {
 func PathString(path ...string) string {
 	result := []string{}
 	for _, p := range path {
-		result = append(result, fmt.Sprintf(".%s", p))
+		result = append(result, fmt.Sprintf(".%s", strings.Replace(p, `.`, `\.`, -1)))
 	}
 	return strings.Join(result, "")
 }
