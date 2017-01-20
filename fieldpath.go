@@ -40,6 +40,13 @@ func (p FieldPath) shift() FieldPath {
 	}
 }
 
+func (p FieldPath) append(keys ...string) FieldPath {
+	for _, key := range keys {
+		p = append(p, key)
+	}
+	return p
+}
+
 func (p FieldPath) next() string {
 	if len(p) < 1 {
 		return ""
@@ -71,8 +78,8 @@ func ValueOfPathMust(p string) FieldPath {
 	return f
 }
 
-func AsPath(c ...string) string {
-	return FieldPath(c).String()
+func AsPath(keys ...string) string {
+	return FieldPath(keys).String()
 }
 
 // FieldPaths returns a slice of FieldPaths representing the list of full key paths to
