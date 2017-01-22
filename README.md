@@ -51,7 +51,7 @@ An STree can be created from either json or yaml using one of the following:
     func NewSTreeJson(r io.Reader) (stree STree, err error)
     func NewSTreeYaml(r io.Reader) (stree STree, err error)
 ```
-An STree can be marshaled to either json or yaml using one of the following:
+An STree can be marshaled to either json or yaml regardless of how it was constructed using one of the following:
 ```
     func (s STree) WriteJson(pretty bool) ([]byte, error)
     func (s STree) WriteYaml() ([]byte, error)
@@ -61,7 +61,7 @@ An STree can be marshaled to either json or yaml using one of the following:
 
 Once created, an element anywhere within an STree can be accessed using a path which is a simplified version of the syntax used by the [jq](https://stedolan.github.io/jq/) tool. For example:
 ```go
-json := `
+s, _ := NewSTreeJson(strings.NewReader(`
 {
   "key1": "val1",
   "key2": 1234,
@@ -72,8 +72,7 @@ json := `
       "key7": [1, "data", {"key8": "val8"}]
     }
   }
-}`
-s, _ := NewSTreeJson(strings.NewReader(json))
+}`))
 v1 := s.StrValMust(`.key1`)                     // v1 is string "val1"
 v2 := s.FloatValMust(`.key3.key5`)              // v2 is float64 -12.34
 v3 := s.IntValMust(`.key3.key6.key7[0]`)        // v3 is int 1
@@ -85,8 +84,7 @@ v5 := s.StrValMust(`.key3.key6.key7[2].key8`)   // v5 is string "val8"
 
 Clients can definite a visitor to easily traverse an STree, handling primitive, nested object and slice differently.
 ```go
-
-json := `
+s, _ := NewSTreeJson(strings.NewReader(`
 {
   "key1": "val1",
   "key2": 1234,
@@ -97,8 +95,7 @@ json := `
       "key7": [1, 2, 3]
     }
   }
-}`
-s, _ := NewSTreeJson(strings.NewReader(json))
+}`))
 
 s.Visit(NewVisitorBuilder().
   WithPrimitiveVisitor(func(key string, val interface{}) error {
@@ -118,7 +115,7 @@ s.Visit(NewVisitorBuilder().
     return nil
   }).
   WithSliceEndVisitor(func(key string, val []interface{}) error {
-    fmt.Printf("slice ending - %s len: %d"", key, len(val))
+    fmt.Printf("slice ending - %s len: %d", key, len(val))
     return nil
   }).
   Visitor(),
@@ -147,14 +144,14 @@ object ending - .key3
 
 Two STrees can be compared to one another. The values, value types and the structure of each STree is taken into account:
 ```go
-json := `
+s1, _ := NewSTreeJson(strings.NewReader(`
 {
   "key1": "val1",
   "key2": 99,
   "key3": [4.32, true, "val2"]
 }
-`
-yaml := `
+`))
+s2, _ := NewSTreeYaml(strings.NewReader(`
 ---
 key1: val1
 key2: 88
@@ -162,9 +159,7 @@ key3:
   - four_point_three_two
   - true
 key4: val4
-`
-s1, _ := NewSTreeJson(strings.NewReader(json))
-s2, _ := NewSTreeYaml(strings.NewReader(yaml))
+`))
 diff, _ := s1.CompareTo(s2)
 
 /*
@@ -180,7 +175,7 @@ map[string]FieldComparisonResult {
 */
 ```
 
-### Known Issues
+### TODO
 
-* Nested lists are not supported, e.g. .listVal[1][2]
+* Support nested lists, e.g. .listVal[1][2]
 
