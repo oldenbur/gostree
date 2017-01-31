@@ -11,6 +11,7 @@ import (
 // clone returns a deep copy of the subject STree
 func (t STree) clone() (STree, error) {
 
+	gob.Register(map[interface{}]interface{}{})
 	gob.Register(STree(map[interface{}]interface{}{}))
 	gob.Register([]interface{}{})
 
