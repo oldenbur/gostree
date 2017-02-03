@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/oldenbur/gostree.svg?branch=master)](https://travis-ci.org/oldenbur/gostree)
 [![GoDoc](https://godoc.org/github.com/golang/gddo?status.svg)](https://godoc.org/github.com/oldenbur/gostree)
-[![top level coverage](https://gocover.io/_badge/github.com/oldenbur/gostree?0 "top level coverage")](http://gocover.io/github.com/oldenbur/gostree)
+[![top level coverage](https://gocover.io/_badge/github.com/oldenbur/gostree "top level coverage")](http://gocover.io/github.com/oldenbur/gostree)
 
 gostree is a utility written in [Go](https://golang.org/) for navigating string-indexed trees of unmarshalled yaml and json. A primary use case is to handle json or yaml that does not have a pre-defined structure. For example, to ingest an arbitrary b-tree structure:
 ```go
