@@ -82,7 +82,7 @@ v5 := s.StrValMust(`.key3.key6.key7[2].key8`)   // v5 is string "val8"
 
 ### Traverse an STree with a Visitor
 
-Clients can definite a visitor to easily traverse an STree, handling primitive, nested object and slice differently.
+Clients can define a visitor using a visitor builder to easily traverse an STree, handling primitive, nested stree objects and slice differently.
 ```go
 s, _ := NewSTreeJson(strings.NewReader(`
 {
