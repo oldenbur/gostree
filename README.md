@@ -51,7 +51,7 @@ An STree can be created from either json or yaml using one of the following:
     func NewSTreeJson(r io.Reader) (stree STree, err error)
     func NewSTreeYaml(r io.Reader) (stree STree, err error)
 ```
-An STree can be marshaled to either json or yaml regardless of how it was constructed using one of the following:
+An STree can be marshaled to either json or yaml *regardless of how it was constructed* using one of the following:
 ```
     func (s STree) WriteJson(pretty bool) ([]byte, error)
     func (s STree) WriteYaml() ([]byte, error)
@@ -82,7 +82,7 @@ v5 := s.StrValMust(`.key3.key6.key7[2].key8`)   // v5 is string "val8"
 
 ### Traverse an STree with a Visitor
 
-Clients can define a visitor using a visitor builder to easily traverse an STree, handling primitive, nested stree objects and slice differently.
+Clients can define a visitor using a builder to easily traverse an STree, handling primitives, nested stree objects and slices differently. Each of the visitor methods is optional.
 ```go
 s, _ := NewSTreeJson(strings.NewReader(`
 {
