@@ -1,6 +1,9 @@
 package gostree
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 type Visitor interface {
 	VisitPrimitive(key string, val interface{}) error
@@ -72,10 +75,25 @@ func (b *VisitorBuilder) Visitor() Visitor {
 }
 
 func (s STree) Visit(v Visitor) error {
-	return s.visitSTree(FieldPath([]string{}), v, s)
+	vis := &visitation{v, nil}
+	return vis.visitSTree(FieldPath([]string{}), s)
 }
 
-func (s STree) visitSTree(parentKey FieldPath, v Visitor, t STree) error {
+type KeySorter func([]string) []string
+
+var KeySorterAlpha KeySorter = func(keys []string) []string { sort.StringSlice(keys).Sort(); return keys }
+
+func (s STree) VisitSorted(v Visitor, sortFunc KeySorter) error {
+	vis := &visitation{v, sortFunc}
+	return vis.visitSTree(FieldPath([]string{}), s)
+}
+
+type visitation struct {
+	visitor  Visitor
+	sortFunc func(keys []string) []string
+}
+
+func (v *visitation) visitSTree(parentKey FieldPath, t STree) error {
 
 	var keys []string
 	var err error
@@ -83,8 +101,14 @@ func (s STree) visitSTree(parentKey FieldPath, v Visitor, t STree) error {
 		return fmt.Errorf("visit KeyStrings error: %v", err)
 	}
 
-	if err = v.VisitSTreeBegin(parentKey.String(), t); err != nil {
-		return err
+	if v.sortFunc != nil {
+		keys = v.sortFunc(keys)
+	}
+
+	if len(parentKey) > 0 {
+		if err = v.visitor.VisitSTreeBegin(parentKey.String(), t); err != nil {
+			return err
+		}
 	}
 	for _, key := range keys {
 
@@ -93,29 +117,30 @@ func (s STree) visitSTree(parentKey FieldPath, v Visitor, t STree) error {
 			return fmt.Errorf("visit Val(%s) error: %v", PathString(key), err)
 		}
 
-		if err = s.visitVal(parentKey.append(key), v, val); err != nil {
+		if err = v.visitVal(parentKey.append(key), val); err != nil {
 			return err
 		}
 	}
-	if err = v.VisitSTreeEnd(parentKey.String(), t); err != nil {
-		return err
+	if len(parentKey) > 0 {
+		if err = v.visitor.VisitSTreeEnd(parentKey.String(), t); err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 
-func (s STree) visitVal(key FieldPath, v Visitor, val interface{}) error {
+func (v *visitation) visitVal(key FieldPath, val interface{}) error {
 
 	if IsPrimitive(val) {
 
-		return v.VisitPrimitive(key.String(), val)
+		return v.visitor.VisitPrimitive(key.String(), val)
 
 	} else if IsMap(val) {
 
 		if sval, ok := val.(STree); !ok {
 			return fmt.Errorf("visitVal failed to convert val to STree: %v", val)
 		} else {
-			return s.visitSTree(key, v, sval)
+			return v.visitSTree(key, sval)
 		}
 
 	} else if IsSlice(val) {
@@ -123,7 +148,7 @@ func (s STree) visitVal(key FieldPath, v Visitor, val interface{}) error {
 		if sval, ok := val.([]interface{}); !ok {
 			return fmt.Errorf("visitVal failed to convert val to []interface{}: %v", val)
 		} else {
-			return s.visitSlice(key, v, sval)
+			return v.visitSlice(key, sval)
 		}
 
 	} else {
@@ -133,10 +158,10 @@ func (s STree) visitVal(key FieldPath, v Visitor, val interface{}) error {
 	}
 }
 
-func (s STree) visitSlice(parentKey FieldPath, v Visitor, a []interface{}) error {
+func (v *visitation) visitSlice(parentKey FieldPath, a []interface{}) error {
 
 	var err error
-	if err = v.VisitSliceBegin(parentKey.String(), a); err != nil {
+	if err = v.visitor.VisitSliceBegin(parentKey.String(), a); err != nil {
 		return err
 	}
 
@@ -144,11 +169,11 @@ func (s STree) visitSlice(parentKey FieldPath, v Visitor, a []interface{}) error
 	for i, aval := range a {
 
 		parentKey[len(parentKey)-1] = fmt.Sprintf("%s[%d]", keyBase, i)
-		if err = s.visitVal(parentKey, v, aval); err != nil {
+		if err = v.visitVal(parentKey, aval); err != nil {
 			return err
 		}
 	}
-	if err = v.VisitSliceEnd(parentKey.String(), a); err != nil {
+	if err = v.visitor.VisitSliceEnd(parentKey.String(), a); err != nil {
 		return err
 	}
 
