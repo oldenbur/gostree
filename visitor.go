@@ -105,11 +105,9 @@ func (v *visitation) visitSTree(parentKey FieldPath, t STree) error {
 		keys = v.sortFunc(keys)
 	}
 
-	if len(parentKey) > 0 {
 		if err = v.visitor.VisitSTreeBegin(parentKey.String(), t); err != nil {
 			return err
 		}
-	}
 	for _, key := range keys {
 
 		var val interface{}
@@ -121,11 +119,9 @@ func (v *visitation) visitSTree(parentKey FieldPath, t STree) error {
 			return err
 		}
 	}
-	if len(parentKey) > 0 {
 		if err = v.visitor.VisitSTreeEnd(parentKey.String(), t); err != nil {
 			return err
 		}
-	}
 	return nil
 }
 

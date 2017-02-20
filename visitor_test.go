@@ -94,6 +94,7 @@ product:
 		)
 		So(err, ShouldBeNil)
 		So(visited, ShouldResemble, []string{
+			"",
 			".boolField",
 			".floatField",
 			".intField",
