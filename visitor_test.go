@@ -65,7 +65,63 @@ product:
 		}
 	})
 
-	Convey("test Visitor Begins", t, func() {
+	Convey("test VisitSorted", t, func() {
+
+		s, err := NewSTreeYaml(strings.NewReader(yamlData))
+		So(err, ShouldBeNil)
+
+		visited := []string{}
+
+		err = s.VisitSorted(
+			NewVisitorBuilder().
+				WithPrimitiveVisitor(func(key string, val interface{}) error {
+					log.Debugf("primitive - key: %s", key)
+					visited = append(visited, key)
+					return nil
+				}).
+				WithSTreeBeginVisitor(func(key string, val STree) error {
+					log.Debugf("stree begin - key: %s", key)
+					visited = append(visited, key)
+					return nil
+				}).
+				WithSliceBeginVisitor(func(key string, val []interface{}) error {
+					log.Debugf("slice being - key: %s", key)
+					visited = append(visited, key)
+					return nil
+				}).
+				Visitor(),
+			KeySorterAlpha,
+		)
+		So(err, ShouldBeNil)
+		So(visited, ShouldResemble, []string{
+			".boolField",
+			".floatField",
+			".intField",
+			".product",
+			".product[0]",
+			".product[0].description",
+			".product[0].price",
+			".product[0].quantity",
+			".product[0].sku",
+			".product[1]",
+			".product[1].description",
+			".product[1].price",
+			".product[1].quantity",
+			".product[1].sku",
+			".strField",
+		})
+	})
+
+	Convey("test Visitor doing nothing", t, func() {
+
+		s, err := NewSTreeYaml(strings.NewReader(yamlData))
+		So(err, ShouldBeNil)
+
+		err = s.Visit(NewVisitorBuilder().Visitor())
+		So(err, ShouldBeNil)
+	})
+
+	Convey("test Visitor Ends", t, func() {
 
 		s, err := NewSTreeYaml(strings.NewReader(yamlData))
 		So(err, ShouldBeNil)
@@ -96,15 +152,6 @@ product:
 		for _, p := range paths {
 			So(visited[p.String()], ShouldEqual, p.String())
 		}
-	})
-
-	Convey("test Visitor doing nothing", t, func() {
-
-		s, err := NewSTreeYaml(strings.NewReader(yamlData))
-		So(err, ShouldBeNil)
-
-		err = s.Visit(NewVisitorBuilder().Visitor())
-		So(err, ShouldBeNil)
 	})
 
 }
