@@ -191,12 +191,12 @@ func (t STree) Val(path string) (interface{}, error) {
 	return nil, fmt.Errorf("Val failed to produce value for key: %s", keyCur)
 }
 
-func (t STree) ValMust(path string) (interface{}, error) {
+func (t STree) ValMust(path string) interface{} {
 	val, err := t.Val(path)
 	if err != nil {
 		panic(err)
 	}
-	return val, nil
+	return val
 }
 
 // SVal returns the value stored in data at the path, converting it
