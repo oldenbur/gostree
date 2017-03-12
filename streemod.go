@@ -48,6 +48,14 @@ func (t STree) SetVal(path string, val interface{}) (STree, error) {
 	return clone.setPathVal(p, val)
 }
 
+func (t STree) SetValMust(path string, val interface{}) STree {
+	u, err := t.SetVal(path, val)
+	if err != nil {
+		panic(err)
+	}
+	return u
+}
+
 func (t STree) setPathVal(path FieldPath, val interface{}) (STree, error) {
 
 	if path == nil || len(path) < 1 {
