@@ -21,6 +21,10 @@ func NewSTree() STree {
 	return map[interface{}]interface{}{}
 }
 
+func NewSTreeCopy(t STree) (STree, error) {
+	return t.clone()
+}
+
 // NewSTreeYaml reads yaml from the specified reader, parses it and returns
 // the structure as an STree.
 func NewSTreeYaml(r io.Reader) (stree STree, err error) {

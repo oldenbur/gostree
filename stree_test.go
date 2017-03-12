@@ -199,6 +199,27 @@ L1:
 		n := newNode(keys[0], s.STreeValMust(AsPath(keys[0])))
 		log.Debugf("n:\n%v", n)
 	})
+
+	Convey("NewSTreeCopy\n", t, func() {
+		s, err := NewSTreeJson(strings.NewReader(`{"key1": "val1", "key2": 1234, "key3": {"key4": true, "key5": -12.34}}`))
+		So(err, ShouldBeNil)
+
+		t, err := NewSTreeCopy(s)
+		So(err, ShouldBeNil)
+
+		r, err := s.CompareTo(t)
+		So(err, ShouldBeNil)
+		for _, rr := range r {
+			So(rr, ShouldEqual, COMP_NO_DIFFERENCE)
+		}
+
+		diffKey := ".key3.key4"
+		t, err = t.SetVal(diffKey, false)
+		So(err, ShouldBeNil)
+		r, err = s.CompareTo(t)
+		So(err, ShouldBeNil)
+		So(r[diffKey], ShouldEqual, COMP_VALUES_DIFFER)
+	})
 }
 
 type node struct {
